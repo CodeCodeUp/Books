@@ -1,7 +1,6 @@
 # Book Recommendation System .gitignore
 
 # 数据文件
-*.csv
 *.json
 *.zip
 *.gz
