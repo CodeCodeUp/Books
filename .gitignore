@@ -1,0 +1,67 @@
+# Book Recommendation System .gitignore
+
+# 数据文件
+*.csv
+*.json
+*.zip
+*.gz
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+.pytest_cache/
+
+# 机器学习模型
+models/
+*.pkl
+*.model
+*.h5
+*.joblib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+tmp/
+temp/
+cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# 实验结果
+experiments/
+results/
+plots/
+
+# 配置文件（可能包含敏感信息）
+config.ini
+.env
+/CLAUDE.md
+
+# 备份文件
+*.bak
+*.backup
+
+# 压缩文件
+*.tar.gz
+*.rar
+*.7z
