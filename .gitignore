@@ -42,6 +42,8 @@ logs/
 tmp/
 temp/
 cache/
+book-recommendation-frontend/node_modules/
+.claude/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -54,7 +56,8 @@ plots/
 # 配置文件（可能包含敏感信息）
 config.ini
 .env
-/CLAUDE.md
+/.claude/CLAUDE.md
+
 
 # 备份文件
 *.bak

@@ -1,18 +1,8 @@
-# Book-Crossing图书推荐系统 - 数据库设计文档
+- V1.0_Initial_Schema.sql
+-- 初始数据库表结构创建
 
-## 数据库连接信息
-```
-Host: 116.205.244.106:3306
-Database: book_recommendation
-Username: root
-Password: 202358hjq
-```
-
-## 数据库表结构
-
-### 1. 用户表 (users)
-```sql
-CREATE TABLE users (
+-- 1. 用户表
+CREATE TABLE IF NOT EXISTS users (
     user_id INT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
     username VARCHAR(50) UNIQUE NOT NULL COMMENT '登录用户名',
     password VARCHAR(255) NOT NULL COMMENT '加密密码',
@@ -33,11 +23,9 @@ CREATE TABLE users (
     INDEX idx_country (country),
     INDEX idx_status (status)
 ) ENGINE=InnoDB AUTO_INCREMENT=300001 DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
-```
 
-### 2. 图书表 (books)
-```sql
-CREATE TABLE books (
+-- 2. 图书表
+CREATE TABLE IF NOT EXISTS books (
     book_id VARCHAR(20) PRIMARY KEY COMMENT '图书ID(ISBN)',
     title VARCHAR(500) NOT NULL COMMENT '图书标题',
     author VARCHAR(200) DEFAULT NULL COMMENT '作者',
@@ -56,11 +44,9 @@ CREATE TABLE books (
     INDEX idx_title (title(100)),
     FULLTEXT idx_search (title, author)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图书信息表';
-```
 
-### 3. 评分表 (ratings)
-```sql
-CREATE TABLE ratings (
+-- 3. 评分表
+CREATE TABLE IF NOT EXISTS ratings (
     rating_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '评分记录ID',
     user_id INT NOT NULL COMMENT '用户ID',
     book_id VARCHAR(20) NOT NULL COMMENT '图书ID',
@@ -73,11 +59,9 @@ CREATE TABLE ratings (
     INDEX idx_rating (rating),
     INDEX idx_rating_date (rating_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户评分表';
-```
 
-### 4. 收藏表 (favorites)
-```sql
-CREATE TABLE favorites (
+-- 4. 收藏表
+CREATE TABLE IF NOT EXISTS favorites (
     favorite_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '收藏记录ID',
     user_id INT NOT NULL COMMENT '用户ID',
     book_id VARCHAR(20) NOT NULL COMMENT '图书ID',
@@ -86,11 +70,9 @@ CREATE TABLE favorites (
     INDEX idx_user_id (user_id),
     INDEX idx_book_id (book_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户收藏表';
-```
 
-### 5. 推荐记录表 (recommendations)
-```sql
-CREATE TABLE recommendations (
+-- 5. 推荐记录表
+CREATE TABLE IF NOT EXISTS recommendations (
     recommend_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '推荐记录ID',
     user_id INT NOT NULL COMMENT '用户ID',
     book_id VARCHAR(20) NOT NULL COMMENT '图书ID',
@@ -103,41 +85,3 @@ CREATE TABLE recommendations (
     INDEX idx_book_id (book_id),
     INDEX idx_algorithm_type (algorithm_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='推荐记录表';
-```
-
-## 数据库修改脚本
-
-### 外键约束清理和用户表修改
-```bash
-# 执行外键删除和用户表修改脚本
-cd scripts && python remove_foreign_keys.py
-```
-
-### 设计变更说明
-- **移除外键约束**：简化数据库结构，提高性能，减少约束冲突
-- **用户表自增主键**：user_id从300001开始自动递增
-- **保持索引优化**：保留所有性能优化索引
-- **适合开发测试**：降低数据操作复杂度
-
-### 6. 修改脚本
-```sql
- -- 1. 修改user_id为自增字段，并设置起始值为30001
-  ALTER TABLE users MODIFY COLUMN user_id INT AUTO_INCREMENT;
-
-  -- 2. 设置自增起始值为30001
-  ALTER TABLE users AUTO_INCREMENT = 300001;
-
-```
-
-## 数据库创建脚本
-
-```sql
--- 创建数据库
-CREATE DATABASE IF NOT EXISTS book_recommendation 
-DEFAULT CHARACTER SET utf8mb4 
-DEFAULT COLLATE utf8mb4_unicode_ci;
-
-USE book_recommendation;
-
--- 按顺序执行上述所有CREATE TABLE语句
-```
