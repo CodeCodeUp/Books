@@ -3,12 +3,15 @@ package com.bookrs.recommendation.controller;
 import com.bookrs.recommendation.common.Result;
 import com.bookrs.recommendation.entity.User;
 import com.bookrs.recommendation.service.UserService;
+import com.bookrs.recommendation.util.JwtTokenUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.constraints.NotBlank;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/users")
@@ -17,6 +20,7 @@ import jakarta.validation.constraints.NotBlank;
 public class UserController {
     
     private final UserService userService;
+    private final JwtTokenUtil jwtTokenUtil;
     
     @PostMapping("/register")
     @Operation(summary = "用户注册")
@@ -35,7 +39,7 @@ public class UserController {
     
     @PostMapping("/login")
     @Operation(summary = "用户登录")
-    public Result<User> login(
+    public Result<Map<String, Object>> login(
             @RequestParam @NotBlank String username,
             @RequestParam @NotBlank String password) {
         
@@ -44,7 +48,14 @@ public class UserController {
             return Result.error("用户名或密码错误");
         }
         
-        return Result.success("登录成功", user);
+        // 生成JWT Token
+        String token = jwtTokenUtil.generateToken(user.getUserId(), user.getUsername());
+        
+        Map<String, Object> loginResult = new HashMap<>();
+        loginResult.put("user", user);
+        loginResult.put("token", token);
+        
+        return Result.success("登录成功", loginResult);
     }
     
     @GetMapping("/{userId}")

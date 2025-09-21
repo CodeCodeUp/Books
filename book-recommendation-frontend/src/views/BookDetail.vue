@@ -32,7 +32,14 @@
             <!-- 用户评分功能 -->
             <div class="user-rating" v-if="userStore.isLoggedIn">
               <span>我的评分：</span>
-              <el-rate v-model="userRating" @change="handleRating" />
+              <el-rate 
+                v-model="userRating" 
+                @change="handleRating"
+                :allow-half="true"
+                :max="5"
+                show-score
+              />
+              <span class="rating-tip">支持0.5分间隔评分</span>
             </div>
           </div>
         </div>
@@ -48,6 +55,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { bookApi } from '../api/book'
+import { ratingApi } from '../api/rating'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()
@@ -66,6 +74,11 @@ const loadBookDetail = async () => {
   try {
     const response = await bookApi.getBookDetail(route.params.bookId)
     book.value = response.data
+    
+    // 加载用户对该图书的评分
+    if (userStore.isLoggedIn) {
+      loadUserRating()
+    }
   } catch (error) {
     ElMessage.error('加载图书详情失败')
   } finally {
@@ -73,9 +86,38 @@ const loadBookDetail = async () => {
   }
 }
 
-const handleRating = (value) => {
-  // 这里可以调用评分API
-  ElMessage.success(`您给这本书评了${value}分`)
+const loadUserRating = async () => {
+  if (!userStore.user) return
+  
+  try {
+    const response = await ratingApi.getUserBookRating(userStore.user.userId, route.params.bookId)
+    if (response.data) {
+      userRating.value = parseFloat(response.data.rating)
+    }
+  } catch (error) {
+    // 用户未评分，忽略错误
+    userRating.value = 0
+  }
+}
+
+const handleRating = async (value) => {
+  if (!userStore.user) {
+    ElMessage.error('请先登录')
+    return
+  }
+  
+  try {
+    await ratingApi.rateBook(userStore.user.userId, route.params.bookId, value)
+    ElMessage.success(`评分成功：${value}分`)
+    
+    // 重新加载图书信息以更新平均评分
+    setTimeout(() => {
+      loadBookDetail()
+    }, 500)
+  } catch (error) {
+    ElMessage.error('评分失败')
+    loadUserRating() // 恢复原评分
+  }
 }
 
 const handleImageError = (event) => {
@@ -146,5 +188,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.rating-tip {
+  font-size: 12px;
+  color: #999;
+  margin-left: 10px;
 }
 </style>

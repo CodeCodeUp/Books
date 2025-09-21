@@ -83,8 +83,11 @@ const handleLogin = async () => {
       try {
         const response = await userApi.login(loginForm.username, loginForm.password)
         
-        userStore.setUser(response.data)
-        userStore.setToken('dummy-token') // 简化版，实际应该从后端返回JWT
+        // 从后端响应中获取用户信息和token
+        const { user, token } = response.data
+        
+        userStore.setUser(user)
+        userStore.setToken(token)
         
         ElMessage.success('登录成功')
         router.push('/')
