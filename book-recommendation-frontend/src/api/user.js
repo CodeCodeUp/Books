@@ -21,9 +21,10 @@ export const userApi = {
   },
   
   // 更新用户信息
-  updateUserInfo(userId, nickname, email) {
+  updateUserInfo(userId, userInfo) {
+    const { nickname, email, location, age, country } = userInfo
     return request.put(`/users/${userId}`, null, {
-      params: { nickname, email }
+      params: { nickname, email, location, age, country }
     })
   }
 }

@@ -73,9 +73,12 @@ public class UserController {
     public Result<String> updateUserInfo(
             @PathVariable Integer userId,
             @RequestParam(required = false) String nickname,
-            @RequestParam(required = false) String email) {
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) Integer age,
+            @RequestParam(required = false) String country) {
         
-        userService.updateUserInfo(userId, nickname, email);
+        userService.updateUserInfo(userId, nickname, email, location, age, country);
         return Result.success("更新成功");
     }
 }

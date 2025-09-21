@@ -48,11 +48,14 @@ public class UserService {
         return null;
     }
     
-    public void updateUserInfo(Integer userId, String nickname, String email) {
+    public void updateUserInfo(Integer userId, String nickname, String email, String location, Integer age, String country) {
         User user = new User();
         user.setUserId(userId);
         user.setNickname(nickname);
         user.setEmail(email);
+        user.setLocation(location);
+        user.setAge(age);
+        user.setCountry(country);
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.updateById(user);
     }

@@ -162,7 +162,17 @@ const handleLogin = async () => {
         })
         
         setTimeout(() => {
-          router.push('/')
+          // 检查用户资料是否完整
+          if (userStore.isProfileIncomplete()) {
+            ElMessage.info({
+              message: '检测到您的资料不完整，完善资料有助于更智能的推荐相关书籍',
+              duration: 5000,
+              showClose: true
+            })
+            router.push('/profile')
+          } else {
+            router.push('/')
+          }
         }, 1000)
         
       } catch (error) {

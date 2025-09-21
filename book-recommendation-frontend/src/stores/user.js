@@ -29,6 +29,13 @@ export const useUserStore = defineStore('user', () => {
     return user.value
   }
   
+  // 检查用户资料是否完整
+  const isProfileIncomplete = () => {
+    if (!user.value) return false
+    const { location, age, country } = user.value
+    return !location || !age || !country
+  }
+  
   return {
     user,
     token,
@@ -36,6 +43,7 @@ export const useUserStore = defineStore('user', () => {
     setUser,
     setToken,
     logout,
-    getUserInfo
+    getUserInfo,
+    isProfileIncomplete
   }
 })

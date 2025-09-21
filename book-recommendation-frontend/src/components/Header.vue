@@ -67,10 +67,6 @@
                   <el-icon><User /></el-icon>
                   个人中心
                 </el-dropdown-item>
-                <el-dropdown-item command="settings" class="dropdown-item">
-                  <el-icon><Setting /></el-icon>
-                  账户设置
-                </el-dropdown-item>
                 <el-dropdown-item divided command="logout" class="dropdown-item logout-item">
                   <el-icon><SwitchButton /></el-icon>
                   退出登录
@@ -182,7 +178,7 @@ import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
 import { 
   Reading, House, Collection, Star, Bell, User, UserFilled, 
-  ArrowDown, Setting, SwitchButton, Menu 
+  ArrowDown, SwitchButton, Menu 
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -202,9 +198,6 @@ const handleCommand = (command) => {
   switch (command) {
     case 'profile':
       router.push('/profile')
-      break
-    case 'settings':
-      ElMessage.info('设置功能即将开放')
       break
     case 'logout':
       userStore.logout()
