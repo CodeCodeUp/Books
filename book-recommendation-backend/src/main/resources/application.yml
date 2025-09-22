@@ -54,3 +54,8 @@ springdoc:
     path: /docs
   swagger-ui:
     path: /swagger-ui.html
+
+# 推荐服务配置
+recommendation:
+  service:
+    url: http://localhost:5000

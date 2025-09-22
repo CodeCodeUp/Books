@@ -9,12 +9,14 @@
 Books/
 ├── book-recommendation-backend/    # SpringBoot后端 ✅
 ├── book-recommendation-frontend/   # Vue3前端 ✅
+├── recommendation-algorithm-service/ # Python算法服务 ✅
 ├── data/                          # 原始Book-Crossing数据集
 ├── processed_data/                # 清洗后的训练数据
 ├── scripts/                       # 数据处理Python脚本
 ├── docs/                          # 完整项目文档
 ├── start-backend.bat/.sh          # 后端启动脚本
 ├── start-frontend.bat/.sh         # 前端启动脚本
+├── start-algorithm.bat/.sh        # 算法服务启动脚本 ✅
 └── README.md                      # 项目指南(本文件)
 ```
 
