@@ -65,6 +65,49 @@ public class RecommendationService {
     }
     
     /**
+     * 基于物品的协同过滤推荐
+     */
+    public Map<String, Object> getItemBasedRecommendations(Integer userId, Integer topN, Double minRating) {
+        log.info("调用物品协同过滤推荐: userId={}, topN={}, minRating={}", userId, topN, minRating);
+        
+        try {
+            String url = algorithmServiceUrl + "/api/recommend/item-based";
+            
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("user_id", userId);
+            requestBody.put("top_n", topN != null ? topN : 10);
+            requestBody.put("min_rating", minRating != null ? minRating : 3.0);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+            
+            ResponseEntity<Map> response = restTemplate.exchange(
+                url, 
+                HttpMethod.POST, 
+                requestEntity, 
+                Map.class
+            );
+            
+            if (response.getStatusCode() == HttpStatus.OK) {
+                Map<String, Object> responseBody = response.getBody();
+                if (responseBody != null && Boolean.TRUE.equals(responseBody.get("success"))) {
+                    log.info("物品协同过滤推荐生成成功");
+                    return responseBody;
+                }
+            }
+            
+            log.error("物品协同过滤推荐服务返回失败状态");
+            return createErrorResponse("推荐服务返回失败状态");
+            
+        } catch (Exception e) {
+            log.error("调用物品协同过滤推荐服务失败", e);
+            return createErrorResponse("推荐服务暂时不可用，请稍后重试");
+        }
+    }
+    
+    /**
      * 获取相似用户
      */
     public Map<String, Object> getSimilarUsers(Integer userId, Integer topK) {
@@ -102,8 +145,41 @@ public class RecommendationService {
     }
     
     /**
-     * 检查推荐服务健康状态
+     * 获取相似图书（物品协同过滤）
      */
+    public Map<String, Object> getSimilarBooks(String bookId, Integer limit) {
+        log.info("获取相似图书: bookId={}, limit={}", bookId, limit);
+        
+        try {
+            String url = algorithmServiceUrl + "/api/recommend/similar-items";
+            
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("item_id", bookId);
+            requestBody.put("top_k", limit != null ? limit : 6);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+            
+            ResponseEntity<Map> response = restTemplate.exchange(
+                url, 
+                HttpMethod.POST, 
+                requestEntity, 
+                Map.class
+            );
+            
+            if (response.getStatusCode() == HttpStatus.OK) {
+                return response.getBody();
+            }
+            
+            return createErrorResponse("获取相似图书失败");
+            
+        } catch (Exception e) {
+            log.error("获取相似图书失败", e);
+            return createErrorResponse("推荐服务暂时不可用");
+        }
+    }
     public boolean isAlgorithmServiceHealthy() {
         try {
             String healthUrl = algorithmServiceUrl + "/health";

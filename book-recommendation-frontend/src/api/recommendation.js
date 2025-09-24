@@ -8,10 +8,24 @@ export const recommendApi = {
     })
   },
   
+  // 基于物品的协同过滤推荐
+  getItemBasedRecommendations(userId, topN = 10, minRating = 3.0) {
+    return request.post('/recommendations/item-based', null, {
+      params: { userId, topN, minRating }
+    })
+  },
+  
   // 获取相似用户
   getSimilarUsers(userId, topK = 10) {
     return request.post('/recommendations/similar-users', null, {
       params: { userId, topK }
+    })
+  },
+  
+  // 获取相似图书
+  getSimilarItems(itemId, userId, topK = 10) {
+    return request.post('/recommendations/similar-items', null, {
+      params: { itemId, userId, topK }
     })
   },
   

@@ -1,5 +1,10 @@
 # Book Recommendation System .gitignore
 
+# Maven构建文件
+target/
+*.jar
+*.war
+
 # 数据文件
 *.json
 *.zip

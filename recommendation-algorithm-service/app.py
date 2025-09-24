@@ -3,6 +3,7 @@ from flask_cors import CORS
 import logging
 import traceback
 from algorithms.collaborative_filtering import UserBasedCollaborativeFiltering
+from algorithms.item_based_cf import ItemBasedCollaborativeFiltering
 from config import Config
 
 # 配置日志
@@ -16,8 +17,9 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # 允许跨域请求
 
-# 初始化推荐算法
+# 初始化推荐算法（共享数据加载器）
 user_cf = UserBasedCollaborativeFiltering()
+item_cf = ItemBasedCollaborativeFiltering(shared_data_loader=user_cf.data_loader)
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -71,6 +73,85 @@ def recommend_user_based():
         return jsonify({
             'success': False,
             'message': f'推荐生成失败: {str(e)}'
+        }), 500
+
+@app.route('/api/recommend/item-based', methods=['POST'])
+def recommend_item_based():
+    """基于物品的协同过滤推荐"""
+    try:
+        # 获取请求参数
+        data = request.get_json()
+        user_id = data.get('user_id')
+        top_n = data.get('top_n', Config.DEFAULT_TOP_N)
+        min_rating = data.get('min_rating', 3.0)
+        
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'message': 'user_id参数必须提供'
+            }), 400
+        
+        logger.info(f"收到物品协同过滤推荐请求: user_id={user_id}, top_n={top_n}, min_rating={min_rating}")
+        
+        # 生成推荐
+        recommendations = item_cf.get_recommendations(
+            user_id=user_id,
+            top_n=top_n,
+            min_rating=min_rating
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'user_id': user_id,
+                'recommendations': recommendations,
+                'total': len(recommendations),
+                'algorithm_info': item_cf.get_algorithm_info()
+            },
+            'message': f'成功生成{len(recommendations)}个推荐'
+        })
+        
+    except Exception as e:
+        logger.error(f"物品协同过滤推荐失败: {e}")
+        logger.error(traceback.format_exc())
+        
+        return jsonify({
+            'success': False,
+            'message': f'推荐生成失败: {str(e)}'
+        }), 500
+
+@app.route('/api/recommend/similar-items', methods=['POST'])
+def get_similar_items():
+    """获取相似图书（喜欢这本书的用户也喜欢）"""
+    try:
+        data = request.get_json()
+        item_id = data.get('item_id')
+        top_k = data.get('top_k', 6)
+        
+        if not item_id:
+            return jsonify({
+                'success': False,
+                'message': 'item_id参数必须提供'
+            }), 400
+        
+        # 直接调用新的相似图书方法
+        similar_books = item_cf.get_similar_books_for_item(item_id, top_k)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'item_id': item_id,
+                'similar_books': similar_books,
+                'total': len(similar_books)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"获取相似图书失败: {e}")
+        
+        return jsonify({
+            'success': False,
+            'message': f'获取相似图书失败: {str(e)}'
         }), 500
 
 @app.route('/api/recommend/similar-users', methods=['POST'])
@@ -196,12 +277,13 @@ def get_algorithm_info():
             'success': True,
             'data': {
                 'available_algorithms': [
-                    user_cf.get_algorithm_info()
+                    user_cf.get_algorithm_info(),
+                    item_cf.get_algorithm_info()
                 ],
                 'service_info': {
                     'name': 'recommendation-algorithm-service',
                     'version': '1.0.0',
-                    'description': '图书推荐算法服务'
+                    'description': '图书推荐算法服务 - 支持用户和物品协同过滤'
                 }
             }
         })
@@ -234,8 +316,9 @@ if __name__ == '__main__':
     # 启动时初始化数据
     logger.info("正在初始化数据...")
     try:
-        user_cf.load_data()  # 启动时全量加载数据
-        logger.info("数据初始化成功")
+        user_cf.load_data()  # 只初始化一次数据
+        item_cf.load_data()  # 使用共享数据
+        logger.info("算法数据初始化成功")
     except Exception as e:
         logger.error(f"数据初始化失败: {e}")
         logger.error("请检查数据库连接后重试")
@@ -243,8 +326,10 @@ if __name__ == '__main__':
     
     logger.info(f"服务地址: http://{Config.FLASK_HOST}:{Config.FLASK_PORT}")
     logger.info("API文档:")
-    logger.info("  POST /api/recommend/user-based  - 用户协同过滤推荐")
+    logger.info("  POST /api/recommend/user-based   - 用户协同过滤推荐")
+    logger.info("  POST /api/recommend/item-based   - 物品协同过滤推荐")
     logger.info("  POST /api/recommend/similar-users - 获取相似用户")
+    logger.info("  POST /api/recommend/similar-items - 获取相似图书")
     logger.info("  POST /api/cache/clear - 清除用户缓存")
     logger.info("  POST /api/cache/precompute - 预计算推荐")
     logger.info("  GET  /api/algorithm/info - 获取算法信息")

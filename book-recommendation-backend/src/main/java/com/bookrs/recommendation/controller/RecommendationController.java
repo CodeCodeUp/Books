@@ -33,6 +33,22 @@ public class RecommendationController {
         }
     }
     
+    @PostMapping("/item-based")
+    @Operation(summary = "基于物品的协同过滤推荐")
+    public Result<Object> getItemBasedRecommendations(
+            @RequestParam Integer userId,
+            @RequestParam(defaultValue = "10") Integer topN,
+            @RequestParam(defaultValue = "3.0") Double minRating) {
+        
+        Map<String, Object> result = recommendationService.getItemBasedRecommendations(userId, topN, minRating);
+        
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            return Result.success("推荐生成成功", result.get("data"));
+        } else {
+            return Result.error(result.get("message").toString());
+        }
+    }
+    
     @PostMapping("/similar-users")
     @Operation(summary = "获取相似用户")
     public Result<Object> getSimilarUsers(

@@ -50,4 +50,20 @@ public class BookService {
                 .last("LIMIT " + limit);
         return bookMapper.selectList(wrapper);
     }
+    
+    public List<Book> getBooksByAuthor(String bookId, Integer limit) {
+        // 先获取目标图书信息
+        Book targetBook = bookMapper.selectById(bookId);
+        if (targetBook == null || targetBook.getAuthor() == null) {
+            return getPopularBooks(limit); // 降级到热门图书
+        }
+        
+        LambdaQueryWrapper<Book> wrapper = new LambdaQueryWrapper<Book>()
+                .eq(Book::getAuthor, targetBook.getAuthor())
+                .ne(Book::getBookId, bookId) // 排除当前图书
+                .orderByDesc(Book::getAvgRating)
+                .orderByDesc(Book::getRatingCount)
+                .last("LIMIT " + limit);
+        return bookMapper.selectList(wrapper);
+    }
 }

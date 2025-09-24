@@ -25,5 +25,12 @@ export const bookApi = {
     return request.get('/books/latest', {
       params: { limit }
     })
+  },
+  
+  // 获取相似图书
+  getSimilarBooks(bookId, userId = null, limit = 6) {
+    return request.get(`/books/${bookId}/similar`, {
+      params: { userId, limit }
+    })
   }
 }
