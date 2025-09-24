@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { bookApi } from '../api/book'
@@ -189,6 +189,13 @@ const handleImageError = (event) => {
 
 onMounted(() => {
   loadBookDetail()
+})
+
+// 监听路由变化，重新加载数据
+watch(() => route.params.bookId, (newBookId) => {
+  if (newBookId) {
+    loadBookDetail()
+  }
 })
 </script>
 

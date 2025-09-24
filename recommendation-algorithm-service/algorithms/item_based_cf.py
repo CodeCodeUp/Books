@@ -73,11 +73,11 @@ class ItemBasedCollaborativeFiltering:
             return 0.0
     
     def get_similar_books_for_item(self, target_book_id, top_k=10):
-        """获取与目标图书相似的图书（真正的物品协同过滤）"""
+        """获取与目标图书相似的图书（批量优化版本）"""
         logger.info(f"基于评分模式查找与图书 {target_book_id} 相似的图书...")
         
         try:
-            # 1. 获取目标图书的评分数据
+            # 1. 获取评分过目标图书的用户
             target_ratings = self.ratings_df[self.ratings_df['book_id'] == target_book_id]
             
             if target_ratings.empty:
@@ -85,41 +85,61 @@ class ItemBasedCollaborativeFiltering:
                 return []
             
             target_users = set(target_ratings['user_id'].values)
+            target_ratings_dict = dict(zip(target_ratings['user_id'], target_ratings['rating']))
             logger.info(f"目标图书有 {len(target_users)} 个用户评分")
             
-            # 2. 获取所有其他图书，计算与目标图书的相似度
-            all_books = self.books_df['book_id'].unique()
+            # 2. 快速筛选候选图书
+            candidate_ratings = self.ratings_df[
+                (self.ratings_df['user_id'].isin(target_users)) &
+                (self.ratings_df['book_id'] != target_book_id)
+            ]
+            
+            candidate_books = candidate_ratings['book_id'].unique()
+            logger.info(f"候选图书数量: {len(candidate_books)} 本")
+            
+            # 3. 批量计算相似度（优化版本）
             similarities = []
             
-            for other_book_id in all_books:
-                if other_book_id == target_book_id:
-                    continue
-                
-                # 计算两本图书的相似度
-                similarity = self.calculate_item_similarity(target_book_id, other_book_id)
-                
-                if similarity > 0.1:  # 相似度阈值
-                    similarities.append({
-                        'book_id': other_book_id,
-                        'similarity': similarity
-                    })
+            # 按候选图书分组，避免重复查询
+            candidate_ratings_grouped = candidate_ratings.groupby('book_id')
             
-            # 3. 按相似度排序，获取top_k
-            similarities.sort(key=lambda x: x['similarity'], reverse=True)
+            for other_book_id, other_book_ratings in candidate_ratings_grouped:
+                # 直接使用分组后的数据，避免重复过滤
+                other_users = set(other_book_ratings['user_id'].values)
+                common_users = target_users & other_users
+                
+                if len(common_users) >= 2:  # 至少2个共同用户
+                    # 构建共同用户的评分向量
+                    target_vector = [target_ratings_dict[user] for user in common_users]
+                    other_ratings_dict = dict(zip(other_book_ratings['user_id'], other_book_ratings['rating']))
+                    other_vector = [other_ratings_dict[user] for user in common_users]
+                    
+                    # 计算余弦相似度
+                    target_array = np.array(target_vector).reshape(1, -1)
+                    other_array = np.array(other_vector).reshape(1, -1)
+                    
+                    similarity = cosine_similarity(target_array, other_array)[0][0]
+                    similarity = max(0.0, similarity)
+                    
+                    if similarity > 0.1:
+                        similarities.append({
+                            'book_id': other_book_id,
+                            'similarity': similarity,
+                            'common_users_count': len(common_users)
+                        })
+            
+            logger.info(f"批量计算完成，找到 {len(similarities)} 本相似图书")
+            
+            # 4. 按相似度排序
+            similarities.sort(key=lambda x: (x['similarity'], x['common_users_count']), reverse=True)
             top_similar = similarities[:top_k]
             
-            # 4. 补充图书详细信息
+            # 5. 补充图书详细信息
             result = []
             for sim in top_similar:
                 book_info = self.books_df[self.books_df['book_id'] == sim['book_id']]
                 if not book_info.empty:
                     book_data = book_info.iloc[0]
-                    
-                    # 计算共同评分用户数
-                    other_ratings = self.ratings_df[self.ratings_df['book_id'] == sim['book_id']]
-                    other_users = set(other_ratings['user_id'].values)
-                    common_users = target_users & other_users
-                    
                     result.append({
                         'bookId': sim['book_id'],
                         'title': book_data['title'],
@@ -132,11 +152,11 @@ class ItemBasedCollaborativeFiltering:
                         'avgRating': round(float(book_data['avg_rating']), 2),
                         'ratingCount': int(book_data['rating_count']),
                         'similarity': round(sim['similarity'], 3),
-                        'common_users': len(common_users),
-                        'reason': f'基于{len(common_users)}个共同用户的评分模式相似度{sim["similarity"]:.2f}'
+                        'common_users': sim['common_users_count'],
+                        'reason': f'基于{sim["common_users_count"]}个共同用户的评分模式，相似度{sim["similarity"]:.2f}'
                     })
             
-            logger.info(f"找到 {len(result)} 本相似图书")
+            logger.info(f"最终返回 {len(result)} 本相似图书")
             return result
             
         except Exception as e:
