@@ -156,15 +156,15 @@ class UserBasedCollaborativeFiltering:
             # 检查用户是否有评分记录
             user_ratings = self.ratings_df[self.ratings_df['user_id'] == user_id]
             if user_ratings.empty:
-                logger.warning(f"用户 {user_id} 没有评分记录，返回热门推荐")
-                return self._get_popular_recommendations(top_n)
+                logger.warning(f"用户 {user_id} 没有评分记录")
+                return []  # 不做降级，返回空结果让混合推荐处理
             
             # 高效查找相似用户
             similar_users = self.find_similar_users_efficient(user_id)
             
             if not similar_users:
-                logger.warning(f"用户 {user_id} 没有找到相似用户，返回热门推荐")
-                return self._get_popular_recommendations(top_n)
+                logger.warning(f"用户 {user_id} 没有找到相似用户")
+                return []  # 不做降级，返回空结果让混合推荐处理
             
             # 生成推荐
             recommendations = self._generate_recommendations_efficient(
@@ -180,7 +180,7 @@ class UserBasedCollaborativeFiltering:
             
         except Exception as e:
             logger.error(f"生成推荐失败: {e}")
-            return self._get_popular_recommendations(top_n)
+            return []  # 不做降级，返回空结果
     
     def _generate_recommendations_efficient(self, user_id, similar_users, top_n, min_rating):
         """高效生成推荐"""

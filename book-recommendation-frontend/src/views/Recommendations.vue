@@ -158,11 +158,24 @@ const generateRecommendations = async () => {
     )
     
     recommendations.value = response.data.recommendations || []
-    algorithmInfo.value = response.data.algorithm_info?.name || '协同过滤算法'
+    algorithmInfo.value = response.data.algorithm_info?.name || '混合推荐算法'
     
-    // 获取相似用户
-    const similarResponse = await recommendApi.getSimilarUsers(userStore.user.userId, 10)
-    similarUsers.value = similarResponse.data.similar_users || []
+    // 只有当推荐结果中包含协同过滤算法时才获取相似用户
+    const hasCollaborativeResults = recommendations.value.some(rec => 
+      rec.algorithm === 'user_based_cf' || rec.algorithm === 'hybrid'
+    )
+    
+    if (hasCollaborativeResults) {
+      try {
+        const similarResponse = await recommendApi.getSimilarUsers(userStore.user.userId, 10)
+        similarUsers.value = similarResponse.data.similar_users || []
+      } catch (error) {
+        console.log('获取相似用户失败，可能用户无评分历史')
+        similarUsers.value = []
+      }
+    } else {
+      similarUsers.value = []
+    }
     
     ElMessage.success(`成功生成${recommendations.value.length}个推荐`)
     
