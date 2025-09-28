@@ -2,7 +2,9 @@ package com.bookrs.recommendation.controller;
 
 import com.bookrs.recommendation.common.Result;
 import com.bookrs.recommendation.entity.User;
+import com.bookrs.recommendation.entity.Rating;
 import com.bookrs.recommendation.service.UserService;
+import com.bookrs.recommendation.service.RatingService;
 import com.bookrs.recommendation.util.JwtTokenUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.constraints.NotBlank;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,6 +23,7 @@ import java.util.Map;
 public class UserController {
     
     private final UserService userService;
+    private final RatingService ratingService;
     private final JwtTokenUtil jwtTokenUtil;
     
     @PostMapping("/register")
@@ -80,5 +84,12 @@ public class UserController {
         
         userService.updateUserInfo(userId, nickname, email, location, age, country);
         return Result.success("更新成功");
+    }
+    
+    @GetMapping("/{userId}/ratings")
+    @Operation(summary = "获取用户评分历史")
+    public Result<List<Map<String, Object>>> getUserRatings(@PathVariable Integer userId) {
+        List<Map<String, Object>> userRatings = ratingService.getUserRatingsWithBookInfo(userId);
+        return Result.success(userRatings);
     }
 }

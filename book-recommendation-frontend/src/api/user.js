@@ -26,5 +26,10 @@ export const userApi = {
     return request.put(`/users/${userId}`, null, {
       params: { nickname, email, location, age, country }
     })
+  },
+  
+  // 获取用户评分历史
+  getUserRatings(userId) {
+    return request.get(`/users/${userId}/ratings`)
   }
 }

@@ -72,17 +72,6 @@
               </el-form-item>
               
               <el-form-item class="form-item">
-                <div class="form-options">
-                  <el-checkbox v-model="rememberMe" class="remember-checkbox">
-                    记住我
-                  </el-checkbox>
-                  <el-link type="primary" class="forgot-link">
-                    忘记密码？
-                  </el-link>
-                </div>
-              </el-form-item>
-              
-              <el-form-item class="form-item">
                 <button 
                   type="button"
                   :disabled="loading"
@@ -122,7 +111,6 @@ const router = useRouter()
 const userStore = useUserStore()
 const loginFormRef = ref()
 const loading = ref(false)
-const rememberMe = ref(false)
 
 const loginForm = reactive({
   username: '',

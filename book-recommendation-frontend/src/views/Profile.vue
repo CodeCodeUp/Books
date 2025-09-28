@@ -240,6 +240,35 @@ const loadUserInfo = async () => {
   }
 }
 
+const loadUserRatings = async () => {
+  if (!userStore.user) return
+  
+  ratingsLoading.value = true
+  try {
+    const response = await userApi.getUserRatings(userStore.user.userId)
+    userRatings.value = response.data || []
+  } catch (error) {
+    console.log('加载评分历史失败')
+    userRatings.value = []
+  } finally {
+    ratingsLoading.value = false
+  }
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  return new Date(dateString).toLocaleDateString('zh-CN')
+}
+
+const handleImageError = (event) => {
+  event.target.src = '/default-book.jpg'
+}
+
+const viewAllRatings = () => {
+  // 可以跳转到专门的评分历史页面或展开显示
+  ElMessage.info('查看全部评分功能可以后续扩展')
+}
+
 const handleUpdate = async () => {
   if (!userFormRef.value) return
   

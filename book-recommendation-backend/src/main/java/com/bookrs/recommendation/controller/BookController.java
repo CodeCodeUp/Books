@@ -6,6 +6,7 @@ import com.bookrs.recommendation.common.Result;
 import com.bookrs.recommendation.entity.Book;
 import com.bookrs.recommendation.service.BookService;
 import com.bookrs.recommendation.service.RecommendationService;
+import com.bookrs.recommendation.service.RatingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class BookController {
     
     private final BookService bookService;
     private final RecommendationService recommendationService;
+    private final RatingService ratingService;
     
     @GetMapping
     @Operation(summary = "分页查询图书")
@@ -80,5 +82,12 @@ public class BookController {
             List<Book> books = bookService.getBooksByAuthor(bookId, limit);
             return Result.success(books);
         }
+    }
+    
+    @GetMapping("/{bookId}/ratings")
+    @Operation(summary = "获取图书的所有评分")
+    public Result<List<Map<String, Object>>> getBookRatings(@PathVariable String bookId) {
+        List<Map<String, Object>> bookRatings = ratingService.getBookRatingsWithUserInfo(bookId);
+        return Result.success(bookRatings);
     }
 }

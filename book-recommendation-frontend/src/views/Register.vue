@@ -83,18 +83,6 @@
                 </el-input>
               </el-form-item>
               
-              <el-form-item prop="email" class="form-item">
-                <el-input
-                  v-model="registerForm.email"
-                  placeholder="请输入邮箱（可选）"
-                  class="form-input"
-                >
-                  <template #prefix>
-                    <el-icon class="input-icon"><Message /></el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              
               <el-form-item class="form-item">
                 <button 
                   type="button"
@@ -127,7 +115,7 @@ import { useRouter } from 'vue-router'
 import { userApi } from '../api/user'
 import { ElMessage } from 'element-plus'
 import { 
-  User, Lock, Star, CollectionTag, UserFilled, Reading, Message 
+  User, Lock, Star, CollectionTag, UserFilled, Reading 
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -137,8 +125,7 @@ const loading = ref(false)
 const registerForm = reactive({
   username: '',
   password: '',
-  confirmPassword: '',
-  email: ''
+  confirmPassword: ''
 })
 
 const validateConfirmPassword = (rule, value, callback) => {
@@ -161,9 +148,6 @@ const rules = {
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
     { validator: validateConfirmPassword, trigger: 'blur' }
-  ],
-  email: [
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
   ]
 }
 
@@ -174,7 +158,7 @@ const handleRegister = async () => {
     if (valid) {
       loading.value = true
       try {
-        await userApi.register(registerForm.username, registerForm.password, registerForm.email)
+        await userApi.register(registerForm.username, registerForm.password, null)
         
         ElMessage.success('注册成功，请登录')
         router.push('/login')

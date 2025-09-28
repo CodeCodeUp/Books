@@ -54,35 +54,25 @@
     </el-card>
     
     <!-- 推荐结果 -->
-    <div v-if="recommendations.length > 0" class="recommendations-section">
+    <div v-if="recommendations.length > 0 || loading" class="recommendations-section">
       <div class="section-header">
         <h2>为您推荐</h2>
-        <el-tag type="info">{{ algorithmInfo }}</el-tag>
+        <el-tag type="info" v-if="!loading">{{ algorithmInfo }}</el-tag>
       </div>
       
-      <div class="book-grid">
+      <div class="book-grid" v-loading="loading" element-loading-text="正在生成个性化推荐...">
         <div 
           v-for="item in recommendations" 
-          :key="item.book_id"
+          :key="item.bookId"
           class="recommendation-item"
         >
           <BookCard :book="item" :enhanced="true" />
-          <div class="recommendation-info">
-            <div class="predicted-rating">
-              <el-icon><Star /></el-icon>
-              <span>预测评分: {{ item.predicted_rating }}分</span>
-            </div>
-            <div class="recommendation-reason">
-              <el-icon><InfoFilled /></el-icon>
-              <span>{{ item.reason }}</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>
     
     <!-- 相似用户信息 -->
-    <el-card v-if="similarUsers.length > 0" class="similar-users-card">
+    <el-card v-if="similarUsers.length > 0 && !loading" class="similar-users-card">
       <template #header>
         <h3>与您兴趣相似的用户</h3>
       </template>

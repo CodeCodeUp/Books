@@ -32,5 +32,10 @@ export const bookApi = {
     return request.get(`/books/${bookId}/similar`, {
       params: { userId, limit }
     })
+  },
+  
+  // 获取图书的所有评分
+  getBookRatings(bookId) {
+    return request.get(`/books/${bookId}/ratings`)
   }
 }

@@ -2,8 +2,11 @@ package com.bookrs.recommendation.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.bookrs.recommendation.entity.Rating;
+import com.bookrs.recommendation.entity.Book;
+import com.bookrs.recommendation.entity.User;
 import com.bookrs.recommendation.mapper.BookMapper;
 import com.bookrs.recommendation.mapper.RatingMapper;
+import com.bookrs.recommendation.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +29,7 @@ public class RatingService {
     
     private final RatingMapper ratingMapper;
     private final BookMapper bookMapper;
+    private final UserMapper userMapper;
     private final RestTemplate restTemplate;
     
     @Value("${recommendation.service.url:http://localhost:5000}")
@@ -115,8 +120,60 @@ public class RatingService {
     }
     
     /**
-     * 获取图书的所有评分
+     * 获取用户评分历史（包含图书信息）
      */
+    public List<Map<String, Object>> getUserRatingsWithBookInfo(Integer userId) {
+        List<Rating> ratings = getUserRatings(userId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        for (Rating rating : ratings) {
+            // 获取图书信息
+            Book book = bookMapper.selectById(rating.getBookId());
+            if (book != null) {
+                Map<String, Object> ratingInfo = new HashMap<>();
+                ratingInfo.put("ratingId", rating.getRatingId());
+                ratingInfo.put("rating", rating.getRating());
+                ratingInfo.put("ratingDate", rating.getRatingDate());
+                ratingInfo.put("bookId", book.getBookId());
+                ratingInfo.put("title", book.getTitle());
+                ratingInfo.put("author", book.getAuthor());
+                ratingInfo.put("publisher", book.getPublisher());
+                ratingInfo.put("year", book.getYear());
+                ratingInfo.put("imageUrlM", book.getImageUrlM());
+                ratingInfo.put("avgRating", book.getAvgRating());
+                ratingInfo.put("ratingCount", book.getRatingCount());
+                result.add(ratingInfo);
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 获取图书的所有评分（包含用户信息）
+     */
+    public List<Map<String, Object>> getBookRatingsWithUserInfo(String bookId) {
+        List<Rating> ratings = getBookRatings(bookId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        for (Rating rating : ratings) {
+            // 获取用户信息（只获取基本信息，保护隐私）
+            User user = userMapper.selectById(rating.getUserId());
+            if (user != null) {
+                Map<String, Object> ratingInfo = new HashMap<>();
+                ratingInfo.put("ratingId", rating.getRatingId());
+                ratingInfo.put("rating", rating.getRating());
+                ratingInfo.put("ratingDate", rating.getRatingDate());
+                ratingInfo.put("userId", user.getUserId());
+                ratingInfo.put("username", user.getUsername());
+                ratingInfo.put("location", user.getLocation());
+                ratingInfo.put("country", user.getCountry());
+                result.add(ratingInfo);
+            }
+        }
+        
+        return result;
+    }
     public List<Rating> getBookRatings(String bookId) {
         LambdaQueryWrapper<Rating> wrapper = new LambdaQueryWrapper<Rating>()
                 .eq(Rating::getBookId, bookId)

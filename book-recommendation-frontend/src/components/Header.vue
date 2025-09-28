@@ -43,15 +43,6 @@
       <!-- 用户操作区域 -->
       <div class="user-actions">
         <template v-if="userStore.isLoggedIn">
-          <!-- 通知按钮 -->
-          <div class="notification-btn">
-            <el-badge :value="3" class="notification-badge">
-              <el-button circle class="action-btn">
-                <el-icon><Bell /></el-icon>
-              </el-button>
-            </el-badge>
-          </div>
-          
           <!-- 用户下拉菜单 -->
           <el-dropdown @command="handleCommand" class="user-dropdown">
             <div class="user-info">
@@ -66,6 +57,10 @@
                 <el-dropdown-item command="profile" class="dropdown-item">
                   <el-icon><User /></el-icon>
                   个人中心
+                </el-dropdown-item>
+                <el-dropdown-item command="my-ratings" class="dropdown-item">
+                  <el-icon><Star /></el-icon>
+                  我的评分
                 </el-dropdown-item>
                 <el-dropdown-item divided command="logout" class="dropdown-item logout-item">
                   <el-icon><SwitchButton /></el-icon>
@@ -144,6 +139,10 @@
               <el-icon><User /></el-icon>
               个人中心
             </el-button>
+            <el-button @click="handleCommand('my-ratings')" text>
+              <el-icon><Star /></el-icon>
+              我的评分
+            </el-button>
             <el-button @click="handleCommand('logout')" text type="danger">
               <el-icon><SwitchButton /></el-icon>
               退出登录
@@ -177,7 +176,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { ElMessage } from 'element-plus'
 import { 
-  Reading, House, Collection, Star, Bell, User, UserFilled, 
+  Reading, House, Collection, Star, User, UserFilled, 
   ArrowDown, SwitchButton, Menu 
 } from '@element-plus/icons-vue'
 
@@ -198,6 +197,9 @@ const handleCommand = (command) => {
   switch (command) {
     case 'profile':
       router.push('/profile')
+      break
+    case 'my-ratings':
+      router.push('/my-ratings')
       break
     case 'logout':
       userStore.logout()

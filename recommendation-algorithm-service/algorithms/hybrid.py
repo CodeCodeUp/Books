@@ -46,32 +46,54 @@ class HybridRecommendation:
                 # 情况1: 既有评分又有特征 - 混合推荐
                 logger.info("用户有评分历史和特征信息，使用混合推荐")
                 cf_recommendations = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
+                logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
+                
                 content_recommendations = self.content_cf._recommend_by_user_features(user_info, top_n * 2)
+                logger.info(f"内容特征结果: {len(content_recommendations)} 个推荐")
                 
                 if cf_recommendations and content_recommendations:
-                    return self._mix_recommendations(cf_recommendations, content_recommendations, cf_ratio, top_n)
+                    logger.info("两种算法都有结果，执行7:3混合")
+                    mixed_result = self._mix_recommendations(cf_recommendations, content_recommendations, cf_ratio, top_n)
+                    logger.info(f"混合推荐完成: {len(mixed_result)} 个推荐")
+                    return mixed_result
                 elif cf_recommendations:
+                    logger.info("只有协同过滤有结果，使用协同过滤推荐")
                     return cf_recommendations[:top_n]
                 elif content_recommendations:
+                    logger.info("只有内容特征有结果，使用内容特征推荐")
                     return content_recommendations[:top_n]
                 else:
-                    return self._get_fallback_recommendations(top_n)
+                    logger.warning("两种算法都无结果，使用降级推荐")
+                    fallback_result = self._get_fallback_recommendations(top_n)
+                    logger.info(f"降级推荐: {len(fallback_result)} 个推荐")
+                    return fallback_result
                     
             elif has_ratings:
                 # 情况2: 有评分无特征 - 纯协同过滤
                 logger.info("用户有评分历史但无特征信息，使用协同过滤")
                 cf_recommendations = self._get_cf_recommendations_no_fallback(user_id, top_n)
-                return cf_recommendations if cf_recommendations else self._get_fallback_recommendations(top_n)
+                logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
+                if cf_recommendations:
+                    return cf_recommendations
+                else:
+                    logger.warning("协同过滤无结果，使用降级推荐")
+                    fallback_result = self._get_fallback_recommendations(top_n)
+                    logger.info(f"降级推荐: {len(fallback_result)} 个推荐")
+                    return fallback_result
                 
             elif has_features:
                 # 情况3: 有特征无评分 - 基于用户特征推荐
                 logger.info("用户有特征信息但无评分历史，使用基于特征的内容推荐")
-                return self.content_cf._recommend_by_user_features(user_info, top_n)
+                content_result = self.content_cf._recommend_by_user_features(user_info, top_n)
+                logger.info(f"基于用户特征推荐: {len(content_result)} 个推荐")
+                return content_result
                 
             else:
                 # 情况4: 既无评分又无特征 - 优质热门图书
                 logger.info("用户既无评分历史又无特征信息，返回优质热门图书")
-                return self._get_fallback_recommendations(top_n)
+                fallback_result = self._get_fallback_recommendations(top_n)
+                logger.info(f"优质热门图书推荐: {len(fallback_result)} 个推荐")
+                return fallback_result
             
         except Exception as e:
             logger.error(f"混合推荐失败: {e}")
@@ -79,19 +101,30 @@ class HybridRecommendation:
     
     def _get_cf_recommendations_no_fallback(self, user_id, top_n):
         """获取协同过滤推荐，不使用热门降级"""
+        logger.info(f"尝试为用户 {user_id} 获取协同过滤推荐...")
+        
         try:
             # 检查用户是否在评分矩阵中
             user_ratings = self.user_cf.ratings_df[self.user_cf.ratings_df['user_id'] == user_id]
             if user_ratings.empty:
+                logger.warning(f"用户 {user_id} 在协同过滤数据中没有评分记录")
                 return []
+            
+            logger.info(f"用户 {user_id} 有 {len(user_ratings)} 条评分记录")
             
             # 尝试找相似用户
             similar_users = self.user_cf.find_similar_users_efficient(user_id)
             if not similar_users:
+                logger.warning(f"用户 {user_id} 没有找到相似用户（可能评分太少或无共同兴趣）")
                 return []
             
+            logger.info(f"找到 {len(similar_users)} 个相似用户")
+            
             # 生成协同过滤推荐
-            return self.user_cf._generate_personalized_recommendations(user_id, top_n, 3.0)
+            recommendations = self.user_cf._generate_recommendations_efficient(user_id, similar_users, top_n, 3.0)
+            logger.info(f"协同过滤生成了 {len(recommendations)} 个推荐")
+            
+            return recommendations
             
         except Exception as e:
             logger.error(f"获取协同过滤推荐失败: {e}")

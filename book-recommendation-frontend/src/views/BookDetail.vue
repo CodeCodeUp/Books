@@ -46,8 +46,60 @@
       </div>
     </el-card>
     
+    <!-- 用户评分区域（默认隐藏，点击显示） -->
+    <el-card class="user-ratings-section">
+      <template #header>
+        <div class="ratings-header">
+          <h3>
+            <el-icon><Comment /></el-icon>
+            用户评分
+          </h3>
+          <el-button 
+            @click="toggleRatingsDisplay"
+            :loading="ratingsLoading && showRatings"
+            type="primary"
+            plain
+          >
+            {{ showRatings ? '隐藏评分' : '查看用户评分' }}
+            ({{ bookRatings.length }}条)
+          </el-button>
+        </div>
+      </template>
+      
+      <div v-if="showRatings" class="ratings-content" v-loading="ratingsLoading" element-loading-text="加载用户评分中...">
+        <div v-if="bookRatings.length > 0" class="ratings-list">
+          <div 
+            v-for="rating in (showAllRatings ? bookRatings : bookRatings.slice(0, 10))" 
+            :key="rating.ratingId"
+            class="rating-item"
+          >
+            <div class="user-info">
+              <el-avatar :size="40">{{ rating.userId }}</el-avatar>
+              <div class="user-details">
+                <span class="username">用户{{ rating.userId }}</span>
+                <span class="user-location">{{ rating.location || rating.country || '未知地区' }}</span>
+              </div>
+            </div>
+            <div class="rating-content">
+              <el-rate :model-value="parseFloat(rating.rating)" disabled size="small" />
+              <span class="rating-value">{{ rating.rating }}分</span>
+              <span class="rating-date">{{ formatDate(rating.ratingDate) }}</span>
+            </div>
+          </div>
+          
+          <div v-if="bookRatings.length > 10" class="more-ratings">
+            <el-button text @click="showAllRatings = !showAllRatings">
+              {{ showAllRatings ? '收起' : `查看全部${bookRatings.length}条评分` }}
+            </el-button>
+          </div>
+        </div>
+        
+        <el-empty v-else description="暂无用户评分" :image-size="80" />
+      </div>
+    </el-card>
+    
     <!-- 相似图书推荐 -->
-    <el-card v-if="similarBooks.length > 0" class="similar-books-card">
+    <el-card v-if="similarBooks.length > 0 || similarBooksLoading" class="similar-books-card">
       <template #header>
         <h3>
           <el-icon><Connection /></el-icon>
@@ -55,7 +107,7 @@
         </h3>
       </template>
       
-      <div class="similar-books-grid">
+      <div class="similar-books-grid" v-loading="similarBooksLoading" element-loading-text="正在分析相似图书...">
         <div 
           v-for="book in similarBooks" 
           :key="book.bookId || book.book_id"
@@ -105,6 +157,11 @@ const book = ref(null)
 const loading = ref(false)
 const userRating = ref(0)
 const similarBooks = ref([])
+const bookRatings = ref([])
+const ratingsLoading = ref(false)
+const similarBooksLoading = ref(false)
+const showAllRatings = ref(false)
+const showRatings = ref(false)  // 控制用户评分显示/隐藏
 
 const displayRating = computed(() => {
   return book.value?.avgRating || 0
@@ -123,6 +180,13 @@ const loadBookDetail = async () => {
     
     // 加载相似图书
     loadSimilarBooks()
+    
+    // 加载评分数量（不加载详细数据）
+    loadRatingsCount()
+    
+    // 重置评分显示状态
+    showRatings.value = false
+    showAllRatings.value = false
   } catch (error) {
     ElMessage.error('加载图书详情失败')
   } finally {
@@ -130,7 +194,31 @@ const loadBookDetail = async () => {
   }
 }
 
+const loadRatingsCount = async () => {
+  try {
+    const response = await bookApi.getBookRatings(route.params.bookId)
+    const ratings = response.data || []
+    
+    // 只保存评分数量，不保存详细数据
+    bookRatings.value = ratings.map(rating => ({ ratingId: rating.ratingId }))
+    
+  } catch (error) {
+    console.log('获取评分数量失败')
+    bookRatings.value = []
+  }
+}
+
+const toggleRatingsDisplay = async () => {
+  showRatings.value = !showRatings.value
+  
+  // 如果是第一次显示，加载完整评分数据
+  if (showRatings.value && (bookRatings.value.length === 0 || !bookRatings.value[0].rating)) {
+    await loadBookRatings()
+  }
+}
+
 const loadSimilarBooks = async () => {
+  similarBooksLoading.value = true
   try {
     const response = await bookApi.getSimilarBooks(route.params.bookId, null, 6)
     // 处理返回的数据结构
@@ -142,7 +230,27 @@ const loadSimilarBooks = async () => {
   } catch (error) {
     console.log('加载相似图书失败，可能是算法服务未启动')
     similarBooks.value = []
+  } finally {
+    similarBooksLoading.value = false
   }
+}
+
+const loadBookRatings = async () => {
+  ratingsLoading.value = true
+  try {
+    const response = await bookApi.getBookRatings(route.params.bookId)
+    bookRatings.value = response.data || []
+  } catch (error) {
+    console.log('加载图书评分失败')
+    bookRatings.value = []
+  } finally {
+    ratingsLoading.value = false
+  }
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  return new Date(dateString).toLocaleDateString('zh-CN')
 }
 
 const goToBook = (bookId) => {
@@ -194,6 +302,15 @@ onMounted(() => {
 // 监听路由变化，重新加载数据
 watch(() => route.params.bookId, (newBookId) => {
   if (newBookId) {
+    // 重置所有状态
+    book.value = null
+    userRating.value = 0
+    similarBooks.value = []
+    bookRatings.value = []
+    showRatings.value = false
+    showAllRatings.value = false
+    
+    // 重新加载数据
     loadBookDetail()
   }
 })
@@ -329,5 +446,91 @@ watch(() => route.params.bookId, (newBookId) => {
 .similar-book-item .rating-text {
   font-size: 12px;
   color: #666;
+}
+
+.user-ratings-section {
+  margin-top: 20px;
+}
+
+.ratings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ratings-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ratings-content {
+  margin-top: 20px;
+}
+
+.book-ratings-card {
+  margin-top: 30px;
+}
+
+.ratings-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.rating-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.rating-item:last-child {
+  border-bottom: none;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.username {
+  font-weight: bold;
+  color: #333;
+}
+
+.user-location {
+  font-size: 12px;
+  color: #999;
+}
+
+.rating-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rating-value {
+  font-weight: bold;
+  color: #666;
+}
+
+.rating-date {
+  font-size: 12px;
+  color: #999;
+}
+
+.more-ratings {
+  text-align: center;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #f0f0f0;
 }
 </style>
