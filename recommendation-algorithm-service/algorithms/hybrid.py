@@ -48,7 +48,7 @@ class HybridRecommendation:
                 cf_recommendations = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
                 logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
                 
-                content_recommendations = self.content_cf._recommend_by_user_features(user_info, top_n * 2)
+                content_recommendations = self.content_cf._recommend_by_user_features(user_info, user_id, top_n * 2)
                 logger.info(f"内容特征结果: {len(content_recommendations)} 个推荐")
                 
                 if cf_recommendations and content_recommendations:
@@ -84,7 +84,7 @@ class HybridRecommendation:
             elif has_features:
                 # 情况3: 有特征无评分 - 基于用户特征推荐
                 logger.info("用户有特征信息但无评分历史，使用基于特征的内容推荐")
-                content_result = self.content_cf._recommend_by_user_features(user_info, top_n)
+                content_result = self.content_cf._recommend_by_user_features(user_info, user_id, top_n)
                 logger.info(f"基于用户特征推荐: {len(content_result)} 个推荐")
                 return content_result
                 

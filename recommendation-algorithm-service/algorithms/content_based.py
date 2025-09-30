@@ -346,11 +346,11 @@ class ContentBasedRecommendation:
             
             # 1. 作者相似度 (权重50%)
             if book1['author'] == book2['author'] and pd.notna(book1['author']):
-                similarity += 0.5
+                similarity += 0.4
             
             # 2. 出版社相似度 (权重20%)
             if book1['publisher'] == book2['publisher'] and pd.notna(book1['publisher']):
-                similarity += 0.2
+                similarity += 0.3
             
             # 3. 年份相似度 (权重20%)
             if pd.notna(book1['year']) and pd.notna(book2['year']):
@@ -380,19 +380,19 @@ class ContentBasedRecommendation:
             
             if not user_info or not self._has_valid_user_features(user_info):
                 logger.info(f"用户 {user_id} 没有有效的特征信息，返回热门图书")
-                return self._get_top_quality_books(top_n)
+                return self._get_top_quality_books_excluding_rated(user_id, top_n)
             
             logger.info(f"用户特征: 年龄={user_info.get('age')}, 国家={user_info.get('country')}, 地区={user_info.get('location')}")
             
-            # 2. 基于用户特征推荐图书
-            recommendations = self._recommend_by_user_features(user_info, top_n)
+            # 2. 基于用户特征推荐图书（传入user_id用于排除已评分图书）
+            recommendations = self._recommend_by_user_features(user_info, user_id, top_n)
             
             logger.info(f"基于用户特征生成 {len(recommendations)} 个推荐")
             return recommendations
             
         except Exception as e:
             logger.error(f"内容特征推荐失败: {e}")
-            return self._get_top_quality_books(top_n)
+            return self._get_top_quality_books_excluding_rated(user_id, top_n)
     
     def _get_user_basic_info(self, user_id):
         """获取用户基础信息"""
@@ -422,16 +422,25 @@ class ContentBasedRecommendation:
             (user_info.get('location') is not None and str(user_info.get('location')).strip() != '')
         )
     
-    def _recommend_by_user_features(self, user_info, top_n):
+    def _recommend_by_user_features(self, user_info, user_id, top_n):
         """基于用户特征推荐图书"""
         try:
             recommendations = []
             
-            # 获取高质量图书池
+            # 获取用户已评分的图书（重要：必须排除）
+            user_rated_books = set()
+            if user_id:
+                user_ratings = self.ratings_df[self.ratings_df['user_id'] == user_id]
+                user_rated_books = set(user_ratings['book_id'].values)
+            
+            # 获取高质量图书池（排除用户已评分的）
             quality_books = self.books_df[
                 (self.books_df['rating_count'] >= 5) &
-                (self.books_df['avg_rating'] >= 3.0)
+                (self.books_df['avg_rating'] >= 3.5) &
+                (~self.books_df['book_id'].isin(user_rated_books))  # 关键：排除已评分图书
             ].copy()
+            
+            logger.info(f"候选图书池: {len(quality_books)} 本（已排除用户已评分的 {len(user_rated_books)} 本）")
             
             # 为每本书计算与用户特征的匹配度
             for idx, book in quality_books.iterrows():
@@ -483,30 +492,46 @@ class ContentBasedRecommendation:
                     
                     score += 0.4 * age_score
             
-            # 2. 国家/文化匹配 (权重30%)
-            user_country = user_info.get('country', '').lower()
-            book_title = str(book.get('title', '')).lower()
-            book_author = str(book.get('author', '')).lower()
-            
-            if user_country:
-                # 简单的文化匹配规则
-                if user_country in ['usa', 'canada', 'uk', 'australia']:
-                    # 英语国家用户偏好英语作品
-                    if any(name in book_author for name in ['john', 'david', 'michael', 'james', 'robert']):
-                        score += 0.3 * 0.8
-                elif user_country in ['germany', 'france', 'spain', 'italy']:
-                    # 欧洲用户偏好欧洲文学
-                    if any(word in book_title for word in ['europe', 'paris', 'london', 'berlin']):
-                        score += 0.3 * 0.8
-                else:
-                    # 其他国家用户偏好国际经典
-                    score += 0.3 * 0.5
+            # 2. 国家/文化匹配 (权重30%) - 安全的字符串处理
+            try:
+                user_country = user_info.get('country')
+                user_country = str(user_country).lower() if user_country else ''
+                
+                book_title = book.get('title')
+                book_title = str(book_title).lower() if book_title else ''
+                
+                book_author = book.get('author')  
+                book_author = str(book_author).lower() if book_author else ''
+                
+                if user_country:
+                    # 简单的文化匹配规则
+                    if user_country in ['usa', 'canada', 'uk', 'australia']:
+                        # 英语国家用户偏好英语作品
+                        if any(name in book_author for name in ['john', 'david', 'michael', 'james', 'robert']):
+                            score += 0.3 * 0.8
+                    elif user_country in ['germany', 'france', 'spain', 'italy']:
+                        # 欧洲用户偏好欧洲文学
+                        if any(word in book_title for word in ['europe', 'paris', 'london', 'berlin']):
+                            score += 0.3 * 0.8
+                    else:
+                        # 其他国家用户偏好国际经典
+                        score += 0.3 * 0.5
+            except Exception as e:
+                # 字符串处理失败，跳过文化匹配
+                pass
             
             # 3. 图书质量评分 (权重30%)
-            quality_score = float(book.get('avg_rating', 0)) / 5.0
-            popularity_score = min(1.0, int(book.get('rating_count', 0)) / 100)
-            combined_quality = (quality_score + popularity_score) / 2
-            score += 0.3 * combined_quality
+            try:
+                avg_rating = book.get('avg_rating') or 0
+                rating_count = book.get('rating_count') or 0
+                
+                quality_score = float(avg_rating) / 5.0
+                popularity_score = min(1.0, int(rating_count) / 100)
+                combined_quality = (quality_score + popularity_score) / 2
+                score += 0.3 * combined_quality
+            except Exception as e:
+                # 质量评分计算失败，跳过
+                pass
             
             return score
             
@@ -535,7 +560,47 @@ class ContentBasedRecommendation:
         
         return "、".join(reasons) if reasons else f"内容特征匹配度{match_score:.2f}"
     
-    def _get_top_quality_books(self, top_n):
+    def _get_top_quality_books_excluding_rated(self, user_id, top_n):
+        """获取优质图书推荐（排除用户已评分的）"""
+        logger.info("返回评分最高且评价人数最多的热门图书（排除已评分）")
+        
+        try:
+            # 获取用户已评分的图书
+            user_rated_books = set()
+            if user_id:
+                user_ratings = self.ratings_df[self.ratings_df['user_id'] == user_id]
+                user_rated_books = set(user_ratings['book_id'].values)
+            
+            # 选择评分高且评分人数多的图书（排除已评分）
+            top_books = self.books_df[
+                (self.books_df['rating_count'] >= 20) &  # 至少20人评分
+                (self.books_df['avg_rating'] >= 4.0) &   # 评分4.0以上
+                (~self.books_df['book_id'].isin(user_rated_books))  # 排除已评分
+            ].nlargest(top_n, ['avg_rating', 'rating_count'])
+            
+            recommendations = []
+            for _, book in top_books.iterrows():
+                recommendations.append({
+                    'bookId': book['book_id'],
+                    'title': book['title'],
+                    'author': book['author'] or '未知作者',
+                    'publisher': book.get('publisher', '') or '',
+                    'year': int(book['year']) if pd.notna(book['year']) else None,
+                    'imageUrlS': book.get('image_url_s', ''),
+                    'imageUrlM': book.get('image_url_m', ''),
+                    'imageUrlL': book.get('image_url_l', ''),
+                    'avgRating': round(float(book['avg_rating']), 2),
+                    'ratingCount': int(book['rating_count']),
+                    'content_score': round(float(book['avg_rating']) / 5.0, 3),
+                    'algorithm': 'top_quality_books_filtered',
+                    'reason': f'高质量热门图书（{book["avg_rating"]:.1f}分，{book["rating_count"]}人评价）'
+                })
+            
+            return recommendations
+            
+        except Exception as e:
+            logger.error(f"获取热门优质图书失败: {e}")
+            return []
         """获取前10本评分最高且人数最多的图书（新用户无特征时使用）"""
         logger.info("返回评分最高且评价人数最多的热门图书")
         
