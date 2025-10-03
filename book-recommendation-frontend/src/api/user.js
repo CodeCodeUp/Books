@@ -31,5 +31,10 @@ export const userApi = {
   // 获取用户评分历史
   getUserRatings(userId) {
     return request.get(`/users/${userId}/ratings`)
+  },
+  
+  // 获取数据库中已有的国家列表
+  getAvailableCountries() {
+    return request.get('/users/countries')
   }
 }

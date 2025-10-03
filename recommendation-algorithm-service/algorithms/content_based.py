@@ -382,7 +382,7 @@ class ContentBasedRecommendation:
                 logger.info(f"用户 {user_id} 没有有效的特征信息，返回热门图书")
                 return self._get_top_quality_books_excluding_rated(user_id, top_n)
             
-            logger.info(f"用户特征: 年龄={user_info.get('age')}, 国家={user_info.get('country')}, 地区={user_info.get('location')}")
+            logger.info(f"用户特征: 年龄={user_info.get('age')}, 国家={user_info.get('country')}, 年龄组={user_info.get('age_group')}")
             
             # 2. 基于用户特征推荐图书（传入user_id用于排除已评分图书）
             recommendations = self._recommend_by_user_features(user_info, user_id, top_n)
@@ -398,7 +398,7 @@ class ContentBasedRecommendation:
         """获取用户基础信息"""
         try:
             user_query = """
-            SELECT user_id, age, country, location
+            SELECT user_id, age, country, age_group
             FROM users 
             WHERE user_id = %(user_id)s
             """
@@ -418,8 +418,7 @@ class ContentBasedRecommendation:
         """检查用户是否有有效的特征信息"""
         return (
             (user_info.get('age') is not None and user_info.get('age') > 0) or
-            (user_info.get('country') is not None and str(user_info.get('country')).strip() != '') or
-            (user_info.get('location') is not None and str(user_info.get('location')).strip() != '')
+            (user_info.get('country') is not None and str(user_info.get('country')).strip() != '')
         )
     
     def _recommend_by_user_features(self, user_info, user_id, top_n):
@@ -477,20 +476,30 @@ class ContentBasedRecommendation:
         try:
             score = 0.0
             
-            # 1. 年龄匹配 (权重40%)
+            # 1. 年龄组匹配 (权重50%)
+            user_age_group = user_info.get('age_group')
             user_age = user_info.get('age')
-            if user_age and user_age > 0:
+            
+            if user_age_group or user_age:
                 book_year = book.get('year')
                 if pd.notna(book_year):
-                    # 年轻用户偏好新书，年长用户偏好经典
-                    if user_age < 25:
-                        age_score = 1.0 if book_year >= 2000 else 0.5
-                    elif user_age < 40:
-                        age_score = 1.0 if book_year >= 1990 else 0.7
+                    # 基于年龄组的图书年代偏好
+                    if user_age_group == 'Under 18' or (user_age and user_age < 18):
+                        age_score = 1.0 if book_year >= 2005 else 0.6  # 青少年偏好新书
+                    elif user_age_group == '18-24' or (user_age and 18 <= user_age < 25):
+                        age_score = 1.0 if book_year >= 2000 else 0.7  # 年轻人偏好现代书籍
+                    elif user_age_group == '25-34' or (user_age and 25 <= user_age < 35):
+                        age_score = 1.0 if book_year >= 1990 else 0.8  # 青年偏好当代文学
+                    elif user_age_group == '35-44' or (user_age and 35 <= user_age < 45):
+                        age_score = 1.0 if book_year >= 1980 else 0.9  # 中年偏好成熟作品
+                    elif user_age_group == '45-54' or (user_age and 45 <= user_age < 55):
+                        age_score = 1.0 if book_year >= 1970 else 0.9  # 偏好经典文学
+                    elif user_age_group == '55+' or (user_age and user_age >= 55):
+                        age_score = 1.0 if book_year <= 1990 else 0.8  # 老年偏好传统经典
                     else:
-                        age_score = 1.0 if book_year <= 2000 else 0.8
+                        age_score = 0.5  # 未知年龄组默认分数
                     
-                    score += 0.4 * age_score
+                    score += 0.5 * age_score
             
             # 2. 国家/文化匹配 (权重30%) - 安全的字符串处理
             try:
@@ -505,13 +514,13 @@ class ContentBasedRecommendation:
                 
                 if user_country:
                     # 简单的文化匹配规则
-                    if user_country in ['usa', 'canada', 'uk', 'australia']:
+                    if user_country in ['usa', 'united states', 'canada', 'uk', 'united kingdom', 'australia']:
                         # 英语国家用户偏好英语作品
-                        if any(name in book_author for name in ['john', 'david', 'michael', 'james', 'robert']):
+                        if any(name in book_author for name in ['john', 'david', 'michael', 'james', 'robert', 'william', 'thomas']):
                             score += 0.3 * 0.8
-                    elif user_country in ['germany', 'france', 'spain', 'italy']:
+                    elif user_country in ['germany', 'france', 'spain', 'italy', 'netherlands']:
                         # 欧洲用户偏好欧洲文学
-                        if any(word in book_title for word in ['europe', 'paris', 'london', 'berlin']):
+                        if any(word in book_title for word in ['europe', 'paris', 'london', 'berlin', 'rome']):
                             score += 0.3 * 0.8
                     else:
                         # 其他国家用户偏好国际经典
@@ -520,7 +529,7 @@ class ContentBasedRecommendation:
                 # 字符串处理失败，跳过文化匹配
                 pass
             
-            # 3. 图书质量评分 (权重30%)
+            # 3. 图书质量评分 (权重20%)
             try:
                 avg_rating = book.get('avg_rating') or 0
                 rating_count = book.get('rating_count') or 0
@@ -528,7 +537,7 @@ class ContentBasedRecommendation:
                 quality_score = float(avg_rating) / 5.0
                 popularity_score = min(1.0, int(rating_count) / 100)
                 combined_quality = (quality_score + popularity_score) / 2
-                score += 0.3 * combined_quality
+                score += 0.2 * combined_quality
             except Exception as e:
                 # 质量评分计算失败，跳过
                 pass

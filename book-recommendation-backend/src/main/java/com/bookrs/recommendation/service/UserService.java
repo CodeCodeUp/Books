@@ -8,6 +8,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -56,7 +57,41 @@ public class UserService {
         user.setLocation(location);
         user.setAge(age);
         user.setCountry(country);
+        
+        // 根据年龄自动设置年龄组
+        if (age != null) {
+            String ageGroup = getAgeGroup(age);
+            user.setAgeGroup(ageGroup);
+        }
+        
         user.setUpdatedAt(LocalDateTime.now());
         userMapper.updateById(user);
+    }
+    
+    public List<String> getAvailableCountries() {
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
+                .select(User::getCountry)
+                .isNotNull(User::getCountry)
+                .ne(User::getCountry, "")
+                .groupBy(User::getCountry);
+        
+        List<User> users = userMapper.selectList(wrapper);
+        return users.stream()
+                .map(User::getCountry)
+                .filter(country -> country != null && !country.trim().isEmpty())
+                .distinct()
+                .sorted()
+                .toList();
+    }
+    
+    private String getAgeGroup(Integer age) {
+        if (age == null || age <= 0) return "Unknown";
+        
+        if (age < 18) return "Under 18";
+        else if (age < 25) return "18-24";
+        else if (age < 35) return "25-34";
+        else if (age < 45) return "35-44";
+        else if (age < 55) return "45-54";
+        else return "55+";
     }
 }

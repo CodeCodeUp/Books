@@ -92,4 +92,11 @@ public class UserController {
         List<Map<String, Object>> userRatings = ratingService.getUserRatingsWithBookInfo(userId);
         return Result.success(userRatings);
     }
+    
+    @GetMapping("/countries")
+    @Operation(summary = "获取数据库中已有的国家列表")
+    public Result<List<String>> getCountries() {
+        List<String> countries = userService.getAvailableCountries();
+        return Result.success(countries);
+    }
 }

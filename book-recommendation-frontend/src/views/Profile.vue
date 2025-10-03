@@ -94,18 +94,6 @@
                 <h3 class="group-title">个性化信息</h3>
                 <p class="group-description">这些信息将帮助我们为您推荐更合适的图书</p>
                 
-                <el-form-item label="所在地区" prop="location" class="form-item">
-                  <el-input 
-                    v-model="userForm.location" 
-                    placeholder="请输入您的所在地区"
-                    class="form-input"
-                  >
-                    <template #prefix>
-                      <el-icon><LocationFilled /></el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-                
                 <el-form-item label="年龄" prop="age" class="form-item">
                   <el-input-number 
                     v-model="userForm.age" 
@@ -117,26 +105,22 @@
                   />
                 </el-form-item>
                 
-                <el-form-item label="国家/地区" prop="country" class="form-item">
+                <el-form-item label="国家" prop="country" class="form-item">
                   <el-select 
                     v-model="userForm.country" 
-                    placeholder="请选择您的国家/地区"
+                    placeholder="请选择您的国家"
                     class="form-input"
                     filterable
                   >
                     <template #prefix>
                       <el-icon><Flag /></el-icon>
                     </template>
-                    <el-option label="中国" value="中国" />
-                    <el-option label="美国" value="美国" />
-                    <el-option label="英国" value="英国" />
-                    <el-option label="日本" value="日本" />
-                    <el-option label="韩国" value="韩国" />
-                    <el-option label="德国" value="德国" />
-                    <el-option label="法国" value="法国" />
-                    <el-option label="加拿大" value="加拿大" />
-                    <el-option label="澳大利亚" value="澳大利亚" />
-                    <el-option label="其他" value="其他" />
+                    <el-option 
+                      v-for="country in availableCountries" 
+                      :key="country" 
+                      :label="country" 
+                      :value="country" 
+                    />
                   </el-select>
                 </el-form-item>
               </div>
@@ -188,10 +172,11 @@ const userForm = reactive({
   username: '',
   nickname: '',
   email: '',
-  location: '',
   age: null,
   country: ''
 })
+
+const availableCountries = ref([])
 
 const rules = {
   nickname: [
@@ -200,22 +185,18 @@ const rules = {
   email: [
     { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
   ],
-  location: [
-    { required: true, message: '请输入所在地区', trigger: 'blur' }
-  ],
   age: [
     { required: true, message: '请输入年龄', trigger: 'blur' },
     { type: 'number', min: 1, max: 120, message: '年龄必须在 1-120 之间', trigger: 'blur' }
   ],
   country: [
-    { required: true, message: '请选择国家/地区', trigger: 'change' }
+    { required: true, message: '请选择国家', trigger: 'change' }
   ]
 }
 
-// 计算资料完整度
+// 计算资料完整度（删除location）
 const profileCompleteness = computed(() => {
-  // 只考虑必填字段：location, age, country
-  const requiredFields = ['location', 'age', 'country']
+  const requiredFields = ['age', 'country']
   const completedFields = requiredFields.filter(field => {
     const value = userForm[field]
     return value !== null && value !== undefined && value !== ''
@@ -223,9 +204,9 @@ const profileCompleteness = computed(() => {
   return Math.round((completedFields.length / requiredFields.length) * 100)
 })
 
-// 是否显示资料不完整提示
+// 是否显示资料不完整提示（删除location）
 const showIncompleteAlert = computed(() => {
-  return !userForm.location || !userForm.age || !userForm.country
+  return !userForm.age || !userForm.country
 })
 
 const loadUserInfo = async () => {
@@ -234,9 +215,19 @@ const loadUserInfo = async () => {
     userForm.username = user.username || ''
     userForm.nickname = user.nickname || ''
     userForm.email = user.email || ''
-    userForm.location = user.location || ''
     userForm.age = user.age || null
     userForm.country = user.country || ''
+  }
+}
+
+const loadAvailableCountries = async () => {
+  try {
+    const response = await userApi.getAvailableCountries()
+    availableCountries.value = response.data || []
+  } catch (error) {
+    console.log('加载国家列表失败')
+    // 使用默认国家列表
+    availableCountries.value = ['USA', 'UK', 'Canada', 'Germany', 'France', 'Spain', 'Italy', 'Australia']
   }
 }
 
@@ -280,7 +271,6 @@ const handleUpdate = async () => {
         await userApi.updateUserInfo(userStore.user.userId, {
           nickname: userForm.nickname,
           email: userForm.email,
-          location: userForm.location,
           age: userForm.age,
           country: userForm.country
         })
@@ -290,7 +280,6 @@ const handleUpdate = async () => {
           ...userStore.user,
           nickname: userForm.nickname,
           email: userForm.email,
-          location: userForm.location,
           age: userForm.age,
           country: userForm.country
         })
@@ -332,6 +321,7 @@ const resetForm = () => {
 
 onMounted(() => {
   loadUserInfo()
+  loadAvailableCountries()
 })
 </script>
 
