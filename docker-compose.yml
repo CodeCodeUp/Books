@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # 推荐算法服务
+  algorithm-service:
+    build:
+      context: ./recommendation-algorithm-service
+      dockerfile: Dockerfile
+    container_name: book-recommendation-algorithm
+    restart: always
+    environment:
+      DB_HOST: 116.205.244.106
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: 202358hjq
+      DB_NAME: book_recommendation
+      FLASK_ENV: production
+    ports:
+      - "5000:5000"
+    volumes:
+      - algorithm_cache:/app/models/cache
+    networks:
+      - book-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # SpringBoot后端服务
+  backend:
+    build:
+      context: ./book-recommendation-backend
+      dockerfile: Dockerfile
+    container_name: book-recommendation-backend
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://116.205.244.106:3306/book_recommendation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 202358hjq
+      ALGORITHM_SERVICE_URL: http://algorithm-service:5000
+      JWT_SECRET: your-secret-key-change-in-production-environment
+      JWT_EXPIRATION: 86400000
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    networks:
+      - book-network
+    depends_on:
+      algorithm-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # Vue前端服务
+  frontend:
+    build:
+      context: ./book-recommendation-frontend
+      dockerfile: Dockerfile
+    container_name: book-recommendation-frontend
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - book-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# 网络配置
+networks:
+  book-network:
+    driver: bridge
+    name: book-recommendation-network
+
+# 数据卷配置
+volumes:
+  algorithm_cache:
+    name: book-recommendation-algorithm-cache

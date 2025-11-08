@@ -2,9 +2,9 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://116.205.244.106:3306/book_recommendation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://116.205.244.106:33066/book_recommendation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
-    password: 202358hjq
+    password: 202358
     hikari:
       minimum-idle: 5
       maximum-pool-size: 20
