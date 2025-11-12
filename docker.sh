@@ -16,20 +16,27 @@ show_help() {
     echo "使用方法: ./docker.sh [命令]"
     echo ""
     echo "可用命令:"
-    echo -e "  ${GREEN}start${NC}      启动所有服务"
-    echo -e "  ${GREEN}stop${NC}       停止所有服务"
-    echo -e "  ${GREEN}restart${NC}    重启所有服务"
-    echo -e "  ${GREEN}status${NC}     查看服务状态"
-    echo -e "  ${GREEN}logs${NC}       查看实时日志"
-    echo -e "  ${GREEN}build${NC}      重新构建镜像"
-    echo -e "  ${GREEN}clean${NC}      清理所有容器和镜像"
-    echo -e "  ${GREEN}update${NC}     更新并重启服务"
-    echo -e "  ${GREEN}help${NC}       显示此帮助信息"
+    echo -e "  ${GREEN}start${NC}              启动所有服务"
+    echo -e "  ${GREEN}stop${NC}               停止所有服务"
+    echo -e "  ${GREEN}restart${NC}            重启所有服务"
+    echo -e "  ${GREEN}status${NC}             查看服务状态"
+    echo -e "  ${GREEN}logs [服务]${NC}        查看实时日志"
+    echo -e "  ${GREEN}build${NC}              重新构建所有镜像"
+    echo -e "  ${GREEN}rebuild <服务>${NC}     重新构建指定服务"
+    echo -e "  ${GREEN}clean${NC}              清理所有容器和镜像"
+    echo -e "  ${GREEN}update${NC}             更新并重启服务"
+    echo -e "  ${GREEN}help${NC}               显示此帮助信息"
+    echo ""
+    echo "可用服务:"
+    echo -e "  ${YELLOW}frontend${NC}           前端服务"
+    echo -e "  ${YELLOW}backend${NC}            后端服务"
+    echo -e "  ${YELLOW}algorithm${NC}          算法服务"
     echo ""
     echo "示例:"
-    echo "  ./docker.sh start          # 启动服务"
-    echo "  ./docker.sh logs frontend  # 查看前端日志"
-    echo "  ./docker.sh stop           # 停止服务"
+    echo "  ./docker.sh start                  # 启动所有服务"
+    echo "  ./docker.sh logs frontend          # 查看前端日志"
+    echo "  ./docker.sh rebuild algorithm      # 只重新构建算法服务"
+    echo "  ./docker.sh stop                   # 停止服务"
     echo ""
 }
 
@@ -230,9 +237,11 @@ rebuild_services() {
     echo -e "${YELLOW}是否立即重启服务？[y/N]${NC} "
     read -r response
 
-    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-        restart_services
-    fi
+    case "$response" in
+        [yY]|[yY][eE][sS])
+            restart_services
+            ;;
+    esac
 }
 
 # 清理所有资源
@@ -245,10 +254,14 @@ clean_all() {
     echo -e "${YELLOW}是否继续？[y/N]${NC} "
     read -r response
 
-    if [[ ! "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-        echo -e "${GREEN}已取消操作${NC}"
-        exit 0
-    fi
+    case "$response" in
+        [yY]|[yY][eE][sS])
+            ;;
+        *)
+            echo -e "${GREEN}已取消操作${NC}"
+            exit 0
+            ;;
+    esac
 
     echo ""
     echo -e "${YELLOW}[1/4] 停止并删除所有容器...${NC}"
@@ -306,6 +319,66 @@ update_services() {
     echo ""
 }
 
+# 重新构建单个服务
+rebuild_single_service() {
+    local service=$1
+
+    # 服务名称映射
+    case "$service" in
+        frontend)
+            compose_service="frontend"
+            service_name="前端服务"
+            ;;
+        backend)
+            compose_service="backend"
+            service_name="后端服务"
+            ;;
+        algorithm)
+            compose_service="algorithm-service"
+            service_name="算法服务"
+            ;;
+        *)
+            echo -e "${RED}[错误] 未知服务: $service${NC}"
+            echo ""
+            echo -e "${YELLOW}可用服务: frontend, backend, algorithm${NC}"
+            exit 1
+            ;;
+    esac
+
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${GREEN}  重新构建${service_name}${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    echo ""
+
+    echo -e "${YELLOW}[1/3] 停止${service_name}...${NC}"
+    docker-compose stop $compose_service
+
+    echo -e "${YELLOW}[2/3] 重新构建${service_name}镜像...${NC}"
+    docker-compose build --no-cache $compose_service
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}[错误] 构建失败${NC}"
+        exit 1
+    fi
+
+    echo -e "${YELLOW}[3/3] 启动${service_name}...${NC}"
+    docker-compose up -d $compose_service
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}[错误] 启动失败${NC}"
+        exit 1
+    fi
+
+    echo ""
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}  ${service_name}重新构建完成${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    echo ""
+
+    docker-compose ps
+    echo ""
+}
+
 # 主逻辑
 case "$1" in
     start)
@@ -325,6 +398,16 @@ case "$1" in
         ;;
     build)
         rebuild_services
+        ;;
+    rebuild)
+        if [ -z "$2" ]; then
+            echo -e "${RED}[错误] 请指定要重新构建的服务${NC}"
+            echo ""
+            echo -e "${YELLOW}使用方法: ./docker.sh rebuild <服务>${NC}"
+            echo -e "${YELLOW}可用服务: frontend, backend, algorithm${NC}"
+            exit 1
+        fi
+        rebuild_single_service "$2"
         ;;
     clean)
         clean_all
