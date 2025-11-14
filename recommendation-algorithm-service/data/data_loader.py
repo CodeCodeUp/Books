@@ -75,57 +75,72 @@ class DataLoader:
         return books_df
     
     def get_ratings_data(self, force_refresh=False):
-        """获取评分数据（增量更新）"""
-        if self._ratings_df is None or force_refresh:
+        """
+        获取评分数据（增量更新）
+
+        参数:
+            force_refresh: 强制检查增量更新（而非全量加载）
+        """
+        # 首次调用，全量加载
+        if self._ratings_df is None:
             self.initialize_data()
             return self._ratings_df
-        
+
+        # force_refresh=True 时，强制检查增量更新（不是重新全量加载）
         # 检查是否有新评分
         try:
             new_ratings_query = """
             SELECT user_id, book_id, rating, created_at
-            FROM ratings 
+            FROM ratings
             WHERE created_at > %(last_update)s AND rating > 0
             ORDER BY created_at DESC
             """
-            
+
             new_ratings = pd.read_sql(
-                new_ratings_query, 
-                self.engine, 
+                new_ratings_query,
+                self.engine,
                 params={'last_update': self._last_ratings_update}
             )
-            
+
             if not new_ratings.empty:
-                logger.info(f"发现 {len(new_ratings)} 条新评分，更新数据...")
-                
+                logger.info(f"发现 {len(new_ratings)} 条新评分，增量更新数据...")
+
                 # 合并新数据
                 self._ratings_df = pd.concat([new_ratings, self._ratings_df], ignore_index=True)
-                
+
                 # 去重（同一用户对同一图书的最新评分）
                 self._ratings_df = self._ratings_df.sort_values('created_at', ascending=False)
                 self._ratings_df = self._ratings_df.drop_duplicates(
-                    subset=['user_id', 'book_id'], 
+                    subset=['user_id', 'book_id'],
                     keep='first'
                 )
-                
+
                 self._last_ratings_update = datetime.now()
-                logger.info(f"评分数据更新完成，当前总数: {len(self._ratings_df):,}")
-            
+                logger.info(f"评分数据增量更新完成，当前总数: {len(self._ratings_df):,}")
+            else:
+                if force_refresh:
+                    logger.info("未发现新评分，使用缓存数据")
+
             return self._ratings_df
-            
+
         except Exception as e:
             logger.error(f"增量更新评分数据失败: {e}")
             return self._ratings_df
     
     def get_books_data(self, force_refresh=False):
-        """获取图书数据（增量更新）"""
-        if self._books_df is None or force_refresh:
-            if self._books_df is None:
-                self.initialize_data()
-            else:
-                self._books_df = self._load_books_full()
-                self._last_books_update = datetime.now()
+        """
+        获取图书数据（增量更新）
+
+        参数:
+            force_refresh: 强制检查增量更新（而非全量加载）
+        """
+        # 首次调用，全量加载
+        if self._books_df is None:
+            self.initialize_data()
             return self._books_df
+
+        # force_refresh=True 时，强制检查增量更新
+        # 注意：这里不是全量加载，而是立即检查是否有更新
         
         # 检查是否有图书统计更新
         try:

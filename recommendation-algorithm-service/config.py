@@ -7,9 +7,9 @@ class Config:
     # 数据库配置
     DB_CONFIG = {
         'host': '116.205.244.106',
-        'port': 3306,
+        'port': 33066,
         'user': 'root',
-        'password': '202358hjq',
+        'password': '202358',
         'database': 'book_recommendation',
         'charset': 'utf8mb4'
     }

@@ -27,14 +27,29 @@ class HybridRecommendation:
         logger.info("混合推荐算法 - 内容特征数据加载完成")
     
     def get_hybrid_user_recommendations(self, user_id, top_n=10, cf_ratio=0.7):
-        """混合推荐：用户协同过滤 + 内容特征 (推荐页面使用)"""
-        logger.info(f"为用户 {user_id} 生成混合推荐 (用户协同{cf_ratio:.0%} + 内容特征{1-cf_ratio:.0%})")
-        
+        """
+        混合推荐：用户协同过滤 + 内容特征 (推荐页面使用)
+
+        【重要更新】现已支持动态比例调节！
+        - cf_ratio 参数已弃用，系统将根据协同过滤置信度自动计算最优混合比例
+        - 动态比例范围：协同过滤 50%-90%，内容特征 10%-50%
+        - 置信度计算：基于相似用户数量和平均相似度
+
+        参数:
+            user_id: 用户ID
+            top_n: 推荐数量
+            cf_ratio: (已弃用) 保留用于API兼容性，实际使用动态计算
+
+        返回:
+            list: 推荐列表，每个推荐包含置信度信息
+        """
+        logger.info(f"为用户 {user_id} 生成动态比例混合推荐 (协同过滤比例将自动计算)")
+
         try:
             # 1. 检查用户是否有评分历史
             user_ratings = self.user_cf.ratings_df[self.user_cf.ratings_df['user_id'] == user_id]
             has_ratings = not user_ratings.empty
-            
+
             # 2. 检查用户是否有基础特征信息
             user_info = self.content_cf._get_user_basic_info(user_id)
             has_features = user_info and self.content_cf._has_valid_user_features(user_info)
@@ -43,18 +58,44 @@ class HybridRecommendation:
             
             # 3. 根据用户状态决定推荐策略
             if has_ratings and has_features:
-                # 情况1: 既有评分又有特征 - 混合推荐
-                logger.info("用户有评分历史和特征信息，使用混合推荐")
-                cf_recommendations = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
+                # 情况1: 既有评分又有特征 - 混合推荐（使用动态比例）
+                logger.info("用户有评分历史和特征信息，使用动态比例混合推荐")
+
+                # 获取协同过滤推荐（同时获取相似用户数据）
+                cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
                 logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
-                
+
                 content_recommendations = self.content_cf._recommend_by_user_features(user_info, user_id, top_n * 2)
                 logger.info(f"内容特征结果: {len(content_recommendations)} 个推荐")
-                
+
                 if cf_recommendations and content_recommendations:
-                    logger.info("两种算法都有结果，执行7:3混合")
-                    mixed_result = self._mix_recommendations(cf_recommendations, content_recommendations, cf_ratio, top_n)
-                    logger.info(f"混合推荐完成: {len(mixed_result)} 个推荐")
+                    # 动态计算混合比例（核心创新点）
+                    dynamic_cf_ratio, dynamic_content_ratio, confidence_info = self._calculate_dynamic_cf_ratio(
+                        similar_users, user_rating_count
+                    )
+
+                    logger.info(
+                        f"[动态混合推荐] "
+                        f"协同过滤={dynamic_cf_ratio:.1%}, "
+                        f"内容特征={dynamic_content_ratio:.1%} | "
+                        f"置信度={confidence_info.get('confidence_score', 'N/A')}"
+                    )
+
+                    # 使用动态比例执行混合
+                    mixed_result = self._mix_recommendations(
+                        cf_recommendations,
+                        content_recommendations,
+                        dynamic_cf_ratio,  # 使用动态计算的比例
+                        top_n
+                    )
+
+                    # 为每个推荐添加置信度信息（用于前端展示和论文分析）
+                    for rec in mixed_result:
+                        rec['mixing_strategy'] = 'dynamic_confidence_based'
+                        rec['cf_ratio'] = round(dynamic_cf_ratio, 2)
+                        rec['confidence_score'] = confidence_info.get('confidence_score')
+
+                    logger.info(f"动态混合推荐完成: {len(mixed_result)} 个推荐")
                     return mixed_result
                 elif cf_recommendations:
                     logger.info("只有协同过滤有结果，使用协同过滤推荐")
@@ -67,11 +108,11 @@ class HybridRecommendation:
                     fallback_result = self._get_fallback_recommendations(top_n)
                     logger.info(f"降级推荐: {len(fallback_result)} 个推荐")
                     return fallback_result
-                    
+
             elif has_ratings:
                 # 情况2: 有评分无特征 - 纯协同过滤
                 logger.info("用户有评分历史但无特征信息，使用协同过滤")
-                cf_recommendations = self._get_cf_recommendations_no_fallback(user_id, top_n)
+                cf_recommendations, _, _ = self._get_cf_recommendations_no_fallback(user_id, top_n)
                 logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
                 if cf_recommendations:
                     return cf_recommendations
@@ -100,36 +141,127 @@ class HybridRecommendation:
             return self._get_fallback_recommendations(top_n)
     
     def _get_cf_recommendations_no_fallback(self, user_id, top_n):
-        """获取协同过滤推荐，不使用热门降级"""
+        """
+        获取协同过滤推荐，不使用热门降级
+
+        返回:
+            tuple: (recommendations, similar_users, user_rating_count)
+                - recommendations: 推荐列表
+                - similar_users: 相似用户数据（用于动态比例计算）
+                - user_rating_count: 用户评分数量
+        """
         logger.info(f"尝试为用户 {user_id} 获取协同过滤推荐...")
-        
+
         try:
             # 检查用户是否在评分矩阵中
             user_ratings = self.user_cf.ratings_df[self.user_cf.ratings_df['user_id'] == user_id]
             if user_ratings.empty:
                 logger.warning(f"用户 {user_id} 在协同过滤数据中没有评分记录")
-                return []
-            
-            logger.info(f"用户 {user_id} 有 {len(user_ratings)} 条评分记录")
-            
+                return [], [], 0
+
+            user_rating_count = len(user_ratings)
+            logger.info(f"用户 {user_id} 有 {user_rating_count} 条评分记录")
+
             # 尝试找相似用户
             similar_users = self.user_cf.find_similar_users_efficient(user_id)
             if not similar_users:
                 logger.warning(f"用户 {user_id} 没有找到相似用户（可能评分太少或无共同兴趣）")
-                return []
-            
+                return [], [], user_rating_count
+
             logger.info(f"找到 {len(similar_users)} 个相似用户")
-            
+
             # 生成协同过滤推荐
             recommendations = self.user_cf._generate_recommendations_efficient(user_id, similar_users, top_n, 3.0)
             logger.info(f"协同过滤生成了 {len(recommendations)} 个推荐")
-            
-            return recommendations
-            
+
+            # 返回推荐列表、相似用户数据和评分数量（用于动态比例计算）
+            return recommendations, similar_users, user_rating_count
+
         except Exception as e:
             logger.error(f"获取协同过滤推荐失败: {e}")
-            return []
+            return [], [], 0
     
+    def _calculate_dynamic_cf_ratio(self, similar_users_data, user_rating_count):
+        """
+        基于协同过滤置信度动态计算混合比例
+
+        核心思想：协同过滤的可靠性越高，其在混合推荐中的权重就越大
+
+        参数:
+            similar_users_data: list[dict] - 相似用户列表 [{'user_id': x, 'similarity': y}, ...]
+            user_rating_count: int - 目标用户的评分数量
+
+        返回:
+            tuple: (cf_ratio, content_ratio, confidence_info)
+                - cf_ratio: 协同过滤占比 [0.5, 0.9]
+                - content_ratio: 内容特征占比 [0.1, 0.5]
+                - confidence_info: 置信度详细信息（用于日志和论文分析）
+
+        置信度计算公式:
+            confidence = (相似用户数量/50) × 平均相似度
+            cf_ratio = 0.5 + 0.4 × confidence  # 映射到[0.5, 0.9]区间
+        """
+        try:
+            if not similar_users_data or len(similar_users_data) == 0:
+                # 没有相似用户，返回最低协同过滤比例
+                logger.warning("没有相似用户数据，使用最低协同过滤比例 (50%)")
+                return 0.50, 0.50, {
+                    'confidence_score': 0.0,
+                    'num_similar_users': 0,
+                    'avg_similarity': 0.0,
+                    'user_rating_count': user_rating_count,
+                    'strategy': 'minimum_cf_ratio'
+                }
+
+            # 1. 相似用户数量归一化 [0, 1]
+            # 设定50个相似用户为满分，超过50个也按1.0计算
+            num_similar_users = len(similar_users_data)
+            user_quantity_score = min(num_similar_users / 50.0, 1.0)
+
+            # 2. 平均相似度 [0, 1]
+            similarities = [user['similarity'] for user in similar_users_data]
+            avg_similarity = np.mean(similarities)
+
+            # 3. 置信度分数 = 数量得分 × 相似度质量
+            # 这个公式体现了"数量"和"质量"的双重考量
+            confidence_score = user_quantity_score * avg_similarity
+
+            # 4. 映射到协同过滤比例
+            # 基准线：50%（confidence=0时）
+            # 最大值：90%（confidence=1时）
+            # 这样可以保证即使置信度很低，协同过滤也有一半的权重
+            cf_ratio = 0.50 + 0.40 * confidence_score
+            content_ratio = 1.0 - cf_ratio
+
+            # 5. 构建详细信息（用于日志输出和论文分析）
+            confidence_info = {
+                'confidence_score': round(confidence_score, 4),
+                'num_similar_users': num_similar_users,
+                'avg_similarity': round(avg_similarity, 4),
+                'user_rating_count': user_rating_count,
+                'user_quantity_score': round(user_quantity_score, 4),
+                'strategy': 'dynamic_confidence_based'
+            }
+
+            logger.info(
+                f"动态比例计算: "
+                f"相似用户={num_similar_users}个, "
+                f"平均相似度={avg_similarity:.3f}, "
+                f"置信度={confidence_score:.3f}, "
+                f"→ 协同过滤={cf_ratio:.1%}, 内容特征={content_ratio:.1%}"
+            )
+
+            return cf_ratio, content_ratio, confidence_info
+
+        except Exception as e:
+            logger.error(f"动态比例计算失败，回退到固定7:3比例: {e}")
+            # 出错时回退到原始的固定比例
+            return 0.70, 0.30, {
+                'confidence_score': None,
+                'error': str(e),
+                'strategy': 'fallback_fixed_ratio'
+            }
+
     def _get_fallback_recommendations(self, top_n):
         """统一的降级推荐：前10本评分最高且人数最多的图书"""
         logger.info("使用统一降级策略：返回评分最高且评价人数最多的优质图书")

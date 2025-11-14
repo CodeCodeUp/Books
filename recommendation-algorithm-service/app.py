@@ -67,12 +67,13 @@ def recommend_user_based():
                 'recommendations': recommendations,
                 'total': len(recommendations),
                 'algorithm_info': {
-                    'name': '混合推荐算法',
-                    'type': 'hybrid_recommendation',
-                    'description': '用户协同过滤70% + 内容特征30%'
+                    'name': '动态比例混合推荐算法',
+                    'type': 'hybrid_recommendation_dynamic',
+                    'description': '协同过滤50%-90% + 内容特征10%-50%（根据协同过滤置信度自动调节）',
+                    'feature': '基于相似用户数量和平均相似度的动态比例计算'
                 }
             },
-            'message': f'成功生成{len(recommendations)}个混合推荐'
+            'message': f'成功生成{len(recommendations)}个动态混合推荐'
         })
         
     except Exception as e:
@@ -256,16 +257,17 @@ def precompute_recommendations():
         def compute_in_background():
             try:
                 logger.info(f"开始为用户 {user_id} 预计算混合推荐...")
-                
-                # 强制刷新数据，确保获取最新评分
-                logger.info("强制刷新数据以获取最新评分...")
+
+                # 增量更新数据（自动获取最新评分，不需要全量加载）
+                logger.info("检查并更新最新评分数据...")
                 user_cf.ratings_df = user_cf.data_loader.get_ratings_data(force_refresh=True)
-                user_cf.books_df = user_cf.data_loader.get_books_data(force_refresh=True)
-                
+                # 图书数据不需要频繁更新，使用缓存即可
+                user_cf.books_df = user_cf.data_loader.get_books_data(force_refresh=False)
+
                 # 同步更新混合推荐的数据
                 hybrid.content_cf.ratings_df = user_cf.ratings_df
                 hybrid.content_cf.books_df = user_cf.books_df
-                
+
                 recommendations = hybrid.get_hybrid_user_recommendations(user_id)
                 logger.info(f"用户 {user_id} 预计算完成，生成{len(recommendations)}个推荐")
             except Exception as e:
