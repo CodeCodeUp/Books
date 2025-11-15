@@ -36,192 +36,211 @@ class ContentBasedRecommendation:
         logger.info("内容特征推荐算法 - 使用共享数据")
         
     def extract_book_features(self):
-        """提取图书特征矩阵"""
-        logger.info("开始提取图书特征...")
-        
+        """
+        提取图书特征矩阵（TF-IDF优化版本）
+
+        特征组成：
+        1. TF-IDF文本特征（标题+作者+出版社组合）- 1500维
+        2. 年份标准化 - 1维
+        3. 评分标准化 - 1维
+        总维度：约1502维
+        """
+        logger.info("开始提取图书特征（TF-IDF方法）...")
+
         if self.books_df is None:
             self.load_data()
-        
+
         try:
-            features_list = []
-            
-            # 1. 标题TF-IDF特征
-            titles = self.books_df['title'].fillna('').astype(str)
-            title_features = self.tfidf_vectorizer.fit_transform(titles)
-            
-            # 2. 作者特征（one-hot编码）
-            authors = self.books_df['author'].fillna('Unknown').astype(str)
-            author_dummies = pd.get_dummies(authors, prefix='author').values
-            
-            # 3. 出版社特征（one-hot编码）
-            publishers = self.books_df['publisher'].fillna('Unknown').astype(str)
-            publisher_dummies = pd.get_dummies(publishers, prefix='publisher').values
-            
-            # 4. 年份特征（数值标准化）
+            import scipy.sparse as sp
+
+            # ===== 核心：TF-IDF文本特征 =====
+            # 组合文本：标题 + 作者 + 出版社
+            # 这样可以一次性提取所有文本特征，避免维度爆炸
+            combined_text = (
+                self.books_df['title'].fillna('') + ' ' +
+                self.books_df['author'].fillna('') + ' ' +
+                self.books_df['publisher'].fillna('')
+            )
+
+            # TF-IDF提取（1500维）
+            tfidf_features = self.tfidf_vectorizer.fit_transform(combined_text)
+            logger.info(f"TF-IDF特征维度: {tfidf_features.shape[1]}")
+
+            # ===== 辅助：数值特征（标准化） =====
+            # 年份标准化
             years = self.books_df['year'].fillna(2000).astype(float)
             year_features = self.scaler.fit_transform(years.values.reshape(-1, 1))
-            
-            # 5. 评分特征
-            avg_ratings = self.books_df['avg_rating'].fillna(0).astype(float)
-            rating_features = avg_ratings.values.reshape(-1, 1)
-            
-            # 合并所有特征
-            import scipy.sparse as sp
-            all_features = sp.hstack([
-                title_features,
-                sp.csr_matrix(author_dummies),
-                sp.csr_matrix(publisher_dummies),
-                sp.csr_matrix(year_features),
-                sp.csr_matrix(rating_features)
+
+            # 评分标准化
+            ratings = self.books_df['avg_rating'].fillna(0).astype(float)
+            rating_scaler = StandardScaler()
+            rating_features = rating_scaler.fit_transform(ratings.values.reshape(-1, 1))
+
+            # ===== 合并所有特征 =====
+            self.book_features = sp.hstack([
+                tfidf_features,                    # 1500维（主要特征）
+                sp.csr_matrix(year_features),      # 1维
+                sp.csr_matrix(rating_features)     # 1维
             ])
-            
-            self.book_features = all_features
-            
-            logger.info(f"图书特征提取完成: {all_features.shape}")
+
+            logger.info(f"图书特征提取完成: {self.book_features.shape}")
+            logger.info(f"稀疏矩阵非零元素: {self.book_features.nnz:,}")
+            logger.info(f"内存占用估算: {self.book_features.data.nbytes / 1024 / 1024:.1f} MB")
+
             return True
-            
+
         except Exception as e:
             logger.error(f"特征提取失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
-    
-    def build_user_profile(self, user_id):
-        """构建用户兴趣画像"""
-        try:
-            # 获取用户评分历史
-            user_ratings = self.ratings_df[self.ratings_df['user_id'] == user_id]
-            
-            if user_ratings.empty:
-                return None
-            
-            # 获取用户评分过的图书特征
-            rated_books = user_ratings.merge(self.books_df, on='book_id', how='left')
-            
-            # 构建用户偏好特征
-            user_profile = {
-                'favorite_authors': {},
-                'favorite_publishers': {},
-                'year_preference': [],
-                'rating_tendency': user_ratings['rating'].mean(),
-                'total_books': len(user_ratings)
-            }
-            
-            # 作者偏好（加权平均）
-            for _, book in rated_books.iterrows():
-                author = book['author'] or 'Unknown'
-                rating = book['rating']
-                
-                if author not in user_profile['favorite_authors']:
-                    user_profile['favorite_authors'][author] = []
-                user_profile['favorite_authors'][author].append(rating)
-            
-            # 计算作者平均评分
-            for author in user_profile['favorite_authors']:
-                ratings_list = user_profile['favorite_authors'][author]
-                user_profile['favorite_authors'][author] = np.mean(ratings_list)
-            
-            # 年份偏好
-            user_profile['year_preference'] = rated_books['year'].dropna().values
-            
-            return user_profile
-            
-        except Exception as e:
-            logger.error(f"构建用户画像失败: {e}")
-            return None
-    
+
     def get_content_based_recommendations(self, user_id, top_n=10):
-        """基于内容特征的推荐"""
-        logger.info(f"为用户 {user_id} 生成基于内容的推荐...")
-        
+        """
+        基于TF-IDF向量的内容特征推荐
+
+        原理：
+        1. 根据用户评分历史，构建用户的TF-IDF向量（加权平均）
+        2. 计算用户向量与所有候选图书向量的余弦相似度
+        3. 返回相似度最高的Top-N图书
+
+        参数:
+            user_id: 用户ID
+            top_n: 推荐数量
+
+        返回:
+            list: 推荐列表
+        """
+        logger.info(f"为用户 {user_id} 生成基于TF-IDF的内容推荐...")
+
         try:
-            # 确保特征已提取
+            # 1. 确保特征矩阵已提取
             if self.book_features is None:
+                logger.warning("特征矩阵未提取，开始提取...")
                 if not self.extract_book_features():
+                    logger.error("特征提取失败，无法推荐")
                     return []
-            
-            # 构建用户画像
-            user_profile = self.build_user_profile(user_id)
-            if user_profile is None:
-                logger.warning(f"用户 {user_id} 没有评分历史，返回热门图书")
-                return self._get_popular_books_by_content(top_n)
-            
-            # 获取用户已评分的图书
+
+            # 2. 获取用户评分历史
             user_ratings = self.ratings_df[self.ratings_df['user_id'] == user_id]
+
+            if user_ratings.empty:
+                logger.warning(f"用户 {user_id} 没有评分历史，无法构建内容画像")
+                return []
+
+            logger.info(f"用户 {user_id} 评分了 {len(user_ratings)} 本图书")
+
+            # 3. 构建用户TF-IDF向量（加权平均）
+            user_vector = self._build_user_tfidf_vector(user_id, user_ratings)
+
+            if user_vector is None:
+                logger.error("用户向量构建失败")
+                return []
+
+            # 4. 获取候选图书（排除已评分）
             rated_book_ids = set(user_ratings['book_id'].values)
-            
-            # 计算推荐分数
+            candidate_mask = ~self.books_df['book_id'].isin(rated_book_ids)
+            candidate_indices = self.books_df[candidate_mask].index.tolist()
+
+            if not candidate_indices:
+                logger.warning("没有候选图书（用户已评分所有图书）")
+                return []
+
+            logger.info(f"候选图书数量: {len(candidate_indices):,}")
+
+            # 5. 批量计算余弦相似度（矩阵运算，速度快）
+            candidate_features = self.book_features[candidate_indices]
+            similarities = cosine_similarity(user_vector, candidate_features)[0]
+
+            # 6. 排序获取Top-N
+            top_indices = np.argsort(similarities)[::-1][:top_n]
+            top_candidate_indices = [candidate_indices[i] for i in top_indices]
+            top_similarities = similarities[top_indices]
+
+            # 7. 构建推荐结果
             recommendations = []
-            
-            for idx, book in self.books_df.iterrows():
-                book_id = book['book_id']
-                
-                if book_id in rated_book_ids:
-                    continue  # 跳过已评分图书
-                
-                # 计算内容相似度分数
-                content_score = self._calculate_content_score(book, user_profile)
-                
-                if content_score > 0.1:  # 分数阈值
-                    recommendations.append({
-                        'bookId': book_id,
-                        'title': book['title'],
-                        'author': book['author'] or '未知作者',
-                        'publisher': book.get('publisher', '') or '',
-                        'year': int(book['year']) if pd.notna(book['year']) else None,
-                        'imageUrlS': book.get('image_url_s', ''),
-                        'imageUrlM': book.get('image_url_m', ''),
-                        'imageUrlL': book.get('image_url_l', ''),
-                        'avgRating': round(float(book['avg_rating']), 2),
-                        'ratingCount': int(book['rating_count']),
-                        'content_score': round(content_score, 3),
-                        'algorithm': 'content_based',
-                        'reason': f'基于您的阅读偏好和图书内容特征'
-                    })
-            
-            # 按分数排序
-            recommendations.sort(key=lambda x: x['content_score'], reverse=True)
-            
-            logger.info(f"基于内容特征生成 {len(recommendations[:top_n])} 个推荐")
-            return recommendations[:top_n]
-            
+            for idx, similarity in zip(top_candidate_indices, top_similarities):
+                book = self.books_df.iloc[idx]
+                recommendations.append({
+                    'bookId': book['book_id'],
+                    'title': book['title'],
+                    'author': book['author'] or '未知作者',
+                    'publisher': book.get('publisher', '') or '',
+                    'year': int(book['year']) if pd.notna(book['year']) else None,
+                    'imageUrlS': book.get('image_url_s', ''),
+                    'imageUrlM': book.get('image_url_m', ''),
+                    'imageUrlL': book.get('image_url_l', ''),
+                    'avgRating': round(float(book['avg_rating']), 2),
+                    'ratingCount': int(book['rating_count']),
+                    'similarity': round(float(similarity), 3),
+                    'algorithm': 'content_based_tfidf',
+                    'reason': f'内容相似度{similarity:.2f}，与您的阅读偏好匹配'
+                })
+
+            logger.info(f"基于TF-IDF生成 {len(recommendations)} 个推荐")
+            return recommendations
+
         except Exception as e:
-            logger.error(f"内容特征推荐失败: {e}")
+            logger.error(f"TF-IDF内容推荐失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
-    
-    def _calculate_content_score(self, book, user_profile):
-        """计算图书与用户偏好的内容匹配度"""
+
+    def _build_user_tfidf_vector(self, user_id, user_ratings):
+        """
+        构建用户的TF-IDF向量（加权平均）
+
+        原理：
+        用户向量 = Σ(评分 × 图书向量) / Σ评分
+        评分高的图书在用户向量中权重更大
+
+        参数:
+            user_id: 用户ID
+            user_ratings: 用户评分记录
+
+        返回:
+            稀疏矩阵: 用户TF-IDF向量 (1 × 特征维度)
+        """
         try:
-            score = 0.0
-            
-            # 1. 作者偏好匹配 (权重40%)
-            author = book['author'] or 'Unknown'
-            if author in user_profile['favorite_authors']:
-                author_score = user_profile['favorite_authors'][author] / 5.0  # 标准化到0-1
-                score += 0.4 * author_score
-            
-            # 2. 年份偏好匹配 (权重20%)
-            if pd.notna(book['year']) and len(user_profile['year_preference']) > 0:
-                book_year = int(book['year'])
-                year_diff = abs(book_year - np.mean(user_profile['year_preference']))
-                year_score = max(0, 1 - year_diff / 50)  # 年份差距归一化
-                score += 0.2 * year_score
-            
-            # 3. 质量匹配 (权重30%)
-            book_rating = float(book['avg_rating'])
-            user_tendency = user_profile['rating_tendency']
-            rating_diff = abs(book_rating - user_tendency)
-            rating_score = max(0, 1 - rating_diff / 5)
-            score += 0.3 * rating_score
-            
-            # 4. 流行度调节 (权重10%)
-            rating_count = int(book['rating_count'])
-            popularity_score = min(1.0, rating_count / 100)  # 评分数越多越可靠
-            score += 0.1 * popularity_score
-            
-            return score
-            
+            # 合并用户评分与图书信息，获取book_id对应的索引
+            user_books = user_ratings.merge(
+                self.books_df[['book_id']].reset_index(),
+                on='book_id',
+                how='inner'
+            )
+
+            if user_books.empty:
+                logger.warning(f"用户 {user_id} 的评分图书在books_df中找不到")
+                return None
+
+            # 提取图书索引和评分权重
+            book_indices = user_books['index'].tolist()
+            weights = user_books['rating'].values
+
+            logger.info(f"用户向量基于 {len(book_indices)} 本图书构建")
+
+            # 提取这些图书的TF-IDF向量
+            user_rated_features = self.book_features[book_indices]
+
+            # 加权平均（评分作为权重）
+            # 注意：稀疏矩阵的乘法需要特殊处理
+            import scipy.sparse as sp
+            weights = weights.reshape(-1, 1)
+            weighted_features = user_rated_features.multiply(weights)
+            user_vector = weighted_features.sum(axis=0) / weights.sum()
+
+            # 修复：将np.matrix转换为numpy数组，避免sklearn报错
+            # user_vector.sum(axis=0)返回的是np.matrix (1, n)，需要转为(1, n) numpy array
+            if isinstance(user_vector, np.matrix):
+                user_vector = np.asarray(user_vector)
+
+            return user_vector
+
         except Exception as e:
-            logger.error(f"计算内容分数失败: {e}")
-            return 0.0
+            logger.error(f"构建用户TF-IDF向量失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
     
     def get_similar_books_by_content(self, target_book_id, top_k=10):
         """基于内容特征的相似图书推荐（性能优化版本）"""
@@ -369,31 +388,7 @@ class ContentBasedRecommendation:
         except Exception as e:
             logger.error(f"计算图书内容相似度失败: {e}")
             return 0.0
-    
-    def get_content_based_recommendations(self, user_id, top_n=10):
-        """基于内容特征的推荐 - 支持新用户和协同过滤失败场景"""
-        logger.info(f"为用户 {user_id} 生成基于内容的推荐...")
-        
-        try:
-            # 1. 获取用户基础信息（地区、年龄、国家）
-            user_info = self._get_user_basic_info(user_id)
-            
-            if not user_info or not self._has_valid_user_features(user_info):
-                logger.info(f"用户 {user_id} 没有有效的特征信息，返回热门图书")
-                return self._get_top_quality_books_excluding_rated(user_id, top_n)
-            
-            logger.info(f"用户特征: 年龄={user_info.get('age')}, 国家={user_info.get('country')}, 年龄组={user_info.get('age_group')}")
-            
-            # 2. 基于用户特征推荐图书（传入user_id用于排除已评分图书）
-            recommendations = self._recommend_by_user_features(user_info, user_id, top_n)
-            
-            logger.info(f"基于用户特征生成 {len(recommendations)} 个推荐")
-            return recommendations
-            
-        except Exception as e:
-            logger.error(f"内容特征推荐失败: {e}")
-            return self._get_top_quality_books_excluding_rated(user_id, top_n)
-    
+
     def _get_user_basic_info(self, user_id):
         """获取用户基础信息"""
         try:
@@ -606,20 +601,22 @@ class ContentBasedRecommendation:
                 })
             
             return recommendations
-            
+
         except Exception as e:
             logger.error(f"获取热门优质图书失败: {e}")
             return []
-        """获取前10本评分最高且人数最多的图书（新用户无特征时使用）"""
+
+    def _get_top_quality_books(self, top_n):
+        """获取优质热门图书（不排除已评分，用于fallback场景）"""
         logger.info("返回评分最高且评价人数最多的热门图书")
-        
+
         try:
             # 选择评分高且评分人数多的图书
             top_books = self.books_df[
                 (self.books_df['rating_count'] >= 20) &  # 至少20人评分
                 (self.books_df['avg_rating'] >= 4.0)     # 评分4.0以上
             ].nlargest(top_n, ['avg_rating', 'rating_count'])
-            
+
             recommendations = []
             for _, book in top_books.iterrows():
                 recommendations.append({
@@ -637,13 +634,13 @@ class ContentBasedRecommendation:
                     'algorithm': 'top_quality_books',
                     'reason': f'高质量热门图书（{book["avg_rating"]:.1f}分，{book["rating_count"]}人评价）'
                 })
-            
+
             return recommendations
-            
+
         except Exception as e:
             logger.error(f"获取热门优质图书失败: {e}")
             return []
-    
+
     def get_algorithm_info(self):
         """获取算法信息"""
         return {

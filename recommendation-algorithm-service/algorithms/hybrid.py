@@ -24,7 +24,15 @@ class HybridRecommendation:
         """加载数据"""
         # 只加载内容特征算法的数据，协同过滤算法已经加载过了
         self.content_cf.load_data()
-        logger.info("混合推荐算法 - 内容特征数据加载完成")
+
+        # 提取图书TF-IDF特征矩阵（启动时预计算）
+        logger.info("开始提取图书TF-IDF特征矩阵...")
+        if self.content_cf.extract_book_features():
+            logger.info("混合推荐算法 - TF-IDF特征矩阵提取成功")
+        else:
+            logger.error("混合推荐算法 - TF-IDF特征矩阵提取失败")
+
+        logger.info("混合推荐算法 - 数据加载完成")
     
     def get_hybrid_user_recommendations(self, user_id, top_n=10, cf_ratio=0.7):
         """
@@ -58,15 +66,16 @@ class HybridRecommendation:
             
             # 3. 根据用户状态决定推荐策略
             if has_ratings and has_features:
-                # 情况1: 既有评分又有特征 - 混合推荐（使用动态比例）
-                logger.info("用户有评分历史和特征信息，使用动态比例混合推荐")
+                # 情况1: 既有评分又有特征 - 动态比例混合推荐（使用TF-IDF内容特征）
+                logger.info("用户有评分历史和特征信息，使用动态比例混合推荐（TF-IDF）")
 
                 # 获取协同过滤推荐（同时获取相似用户数据）
                 cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
                 logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
 
-                content_recommendations = self.content_cf._recommend_by_user_features(user_info, user_id, top_n * 2)
-                logger.info(f"内容特征结果: {len(content_recommendations)} 个推荐")
+                # 使用TF-IDF内容特征推荐（基于评分历史）
+                content_recommendations = self.content_cf.get_content_based_recommendations(user_id, top_n * 2)
+                logger.info(f"TF-IDF内容特征结果: {len(content_recommendations)} 个推荐")
 
                 if cf_recommendations and content_recommendations:
                     # 动态计算混合比例（核心创新点）
@@ -101,7 +110,7 @@ class HybridRecommendation:
                     logger.info("只有协同过滤有结果，使用协同过滤推荐")
                     return cf_recommendations[:top_n]
                 elif content_recommendations:
-                    logger.info("只有内容特征有结果，使用内容特征推荐")
+                    logger.info("只有TF-IDF内容特征有结果，使用内容特征推荐")
                     return content_recommendations[:top_n]
                 else:
                     logger.warning("两种算法都无结果，使用降级推荐")
@@ -110,14 +119,50 @@ class HybridRecommendation:
                     return fallback_result
 
             elif has_ratings:
-                # 情况2: 有评分无特征 - 纯协同过滤
-                logger.info("用户有评分历史但无特征信息，使用协同过滤")
-                cf_recommendations, _, _ = self._get_cf_recommendations_no_fallback(user_id, top_n)
+                # 情况2: 有评分无特征 - 协同过滤 + TF-IDF内容特征混合（新增能力！）
+                logger.info("用户有评分历史但无特征信息，使用协同过滤 + TF-IDF内容特征混合")
+
+                cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
                 logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
-                if cf_recommendations:
-                    return cf_recommendations
+
+                # 使用TF-IDF内容特征推荐（基于评分历史，不需要用户特征）
+                content_recommendations = self.content_cf.get_content_based_recommendations(user_id, top_n * 2)
+                logger.info(f"TF-IDF内容特征结果: {len(content_recommendations)} 个推荐")
+
+                if cf_recommendations and content_recommendations:
+                    # 动态计算混合比例
+                    dynamic_cf_ratio, dynamic_content_ratio, confidence_info = self._calculate_dynamic_cf_ratio(
+                        similar_users, user_rating_count
+                    )
+
+                    logger.info(
+                        f"[动态混合推荐] "
+                        f"协同过滤={dynamic_cf_ratio:.1%}, "
+                        f"内容特征={dynamic_content_ratio:.1%} | "
+                        f"置信度={confidence_info.get('confidence_score', 'N/A')}"
+                    )
+
+                    # 混合推荐
+                    mixed_result = self._mix_recommendations(
+                        cf_recommendations,
+                        content_recommendations,
+                        dynamic_cf_ratio,
+                        top_n
+                    )
+
+                    for rec in mixed_result:
+                        rec['mixing_strategy'] = 'dynamic_confidence_based'
+                        rec['cf_ratio'] = round(dynamic_cf_ratio, 2)
+                        rec['confidence_score'] = confidence_info.get('confidence_score')
+
+                    logger.info(f"动态混合推荐完成: {len(mixed_result)} 个推荐")
+                    return mixed_result
+                elif cf_recommendations:
+                    return cf_recommendations[:top_n]
+                elif content_recommendations:
+                    return content_recommendations[:top_n]
                 else:
-                    logger.warning("协同过滤无结果，使用降级推荐")
+                    logger.warning("协同过滤和内容特征都无结果，使用降级推荐")
                     fallback_result = self._get_fallback_recommendations(top_n)
                     logger.info(f"降级推荐: {len(fallback_result)} 个推荐")
                     return fallback_result
