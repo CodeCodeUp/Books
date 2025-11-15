@@ -14,8 +14,13 @@ const routes = [
   },
   {
     path: '/register',
-    name: 'Register', 
+    name: 'Register',
     component: () => import('../views/Register.vue')
+  },
+  {
+    path: '/complete-profile',
+    name: 'CompleteProfile',
+    component: () => import('../views/CompleteProfile.vue')
   },
   {
     path: '/books',

@@ -7,34 +7,39 @@ export const userApi = {
       params: { username, password, email }
     })
   },
-  
+
   // 用户登录
   login(username, password) {
     return request.post('/users/login', null, {
       params: { username, password }
     })
   },
-  
+
   // 获取用户信息
   getUserInfo(userId) {
     return request.get(`/users/${userId}`)
   },
-  
+
   // 更新用户信息
   updateUserInfo(userId, userInfo) {
-    const { nickname, email, location, age, country } = userInfo
+    const { nickname, age } = userInfo
     return request.put(`/users/${userId}`, null, {
-      params: { nickname, email, location, age, country }
+      params: { nickname, age }
     })
   },
-  
+
   // 获取用户评分历史
   getUserRatings(userId) {
     return request.get(`/users/${userId}/ratings`)
   },
-  
-  // 获取数据库中已有的国家列表
-  getAvailableCountries() {
-    return request.get('/users/countries')
+
+  // 获取用户兴趣列表
+  getUserInterests(userId) {
+    return request.get(`/users/${userId}/interests`)
+  },
+
+  // 保存用户兴趣（覆盖式更新）
+  saveUserInterests(userId, categoryIds) {
+    return request.post(`/users/${userId}/interests`, categoryIds)
   }
 }

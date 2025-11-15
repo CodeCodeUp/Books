@@ -3,8 +3,10 @@ package com.bookrs.recommendation.controller;
 import com.bookrs.recommendation.common.Result;
 import com.bookrs.recommendation.entity.User;
 import com.bookrs.recommendation.entity.Rating;
+import com.bookrs.recommendation.entity.BookTheme;
 import com.bookrs.recommendation.service.UserService;
 import com.bookrs.recommendation.service.RatingService;
+import com.bookrs.recommendation.service.UserInterestService;
 import com.bookrs.recommendation.util.JwtTokenUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,24 +23,33 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Tag(name = "用户管理", description = "用户注册、登录和信息管理")
 public class UserController {
-    
+
     private final UserService userService;
     private final RatingService ratingService;
+    private final UserInterestService userInterestService;
     private final JwtTokenUtil jwtTokenUtil;
     
     @PostMapping("/register")
     @Operation(summary = "用户注册")
-    public Result<User> register(
+    public Result<Map<String, Object>> register(
             @RequestParam @NotBlank String username,
             @RequestParam @NotBlank String password,
             @RequestParam(required = false) String email) {
-        
+
         if (userService.getUserByUsername(username) != null) {
             return Result.error("用户名已存在");
         }
-        
+
         User user = userService.register(username, password, email);
-        return Result.success("注册成功", user);
+
+        // 生成JWT Token（注册成功后自动登录）
+        String token = jwtTokenUtil.generateToken(user.getUserId(), user.getUsername());
+
+        Map<String, Object> registerResult = new HashMap<>();
+        registerResult.put("user", user);
+        registerResult.put("token", token);
+
+        return Result.success("注册成功", registerResult);
     }
     
     @PostMapping("/login")
@@ -77,26 +88,33 @@ public class UserController {
     public Result<String> updateUserInfo(
             @PathVariable Integer userId,
             @RequestParam(required = false) String nickname,
-            @RequestParam(required = false) String email,
-            @RequestParam(required = false) String location,
-            @RequestParam(required = false) Integer age,
-            @RequestParam(required = false) String country) {
-        
-        userService.updateUserInfo(userId, nickname, email, location, age, country);
+            @RequestParam(required = false) Integer age) {
+
+        userService.updateUserInfo(userId, nickname, age);
         return Result.success("更新成功");
     }
-    
+
+    @GetMapping("/{userId}/interests")
+    @Operation(summary = "获取用户兴趣列表")
+    public Result<List<BookTheme>> getUserInterests(@PathVariable Integer userId) {
+        List<BookTheme> interests = userInterestService.getUserInterests(userId);
+        return Result.success(interests);
+    }
+
+    @PostMapping("/{userId}/interests")
+    @Operation(summary = "保存用户兴趣（覆盖式更新）")
+    public Result<String> saveUserInterests(
+            @PathVariable Integer userId,
+            @RequestBody List<Integer> themeIds) {
+
+        userInterestService.saveUserInterests(userId, themeIds);
+        return Result.success("兴趣保存成功");
+    }
+
     @GetMapping("/{userId}/ratings")
     @Operation(summary = "获取用户评分历史")
     public Result<List<Map<String, Object>>> getUserRatings(@PathVariable Integer userId) {
         List<Map<String, Object>> userRatings = ratingService.getUserRatingsWithBookInfo(userId);
         return Result.success(userRatings);
-    }
-    
-    @GetMapping("/countries")
-    @Operation(summary = "获取数据库中已有的国家列表")
-    public Result<List<String>> getCountries() {
-        List<String> countries = userService.getAvailableCountries();
-        return Result.success(countries);
     }
 }

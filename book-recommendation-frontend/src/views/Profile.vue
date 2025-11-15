@@ -51,11 +51,11 @@
               <!-- 基本信息 -->
               <div class="form-section-group">
                 <h3 class="group-title">基本信息</h3>
-                
+
                 <el-form-item label="用户名" class="form-item">
-                  <el-input 
-                    v-model="userForm.username" 
-                    disabled 
+                  <el-input
+                    v-model="userForm.username"
+                    disabled
                     class="form-input"
                   >
                     <template #prefix>
@@ -63,27 +63,15 @@
                     </template>
                   </el-input>
                 </el-form-item>
-                
+
                 <el-form-item label="昵称" prop="nickname" class="form-item">
-                  <el-input 
-                    v-model="userForm.nickname" 
+                  <el-input
+                    v-model="userForm.nickname"
                     placeholder="请输入您的昵称"
                     class="form-input"
                   >
                     <template #prefix>
                       <el-icon><UserFilled /></el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-                
-                <el-form-item label="邮箱" prop="email" class="form-item">
-                  <el-input 
-                    v-model="userForm.email" 
-                    placeholder="请输入您的邮箱地址"
-                    class="form-input"
-                  >
-                    <template #prefix>
-                      <el-icon><Message /></el-icon>
                     </template>
                   </el-input>
                 </el-form-item>
@@ -93,35 +81,41 @@
               <div class="form-section-group">
                 <h3 class="group-title">个性化信息</h3>
                 <p class="group-description">这些信息将帮助我们为您推荐更合适的图书</p>
-                
+
                 <el-form-item label="年龄" prop="age" class="form-item">
-                  <el-input-number 
-                    v-model="userForm.age" 
-                    :min="1" 
+                  <el-input-number
+                    v-model="userForm.age"
+                    :min="1"
                     :max="120"
                     placeholder="请输入您的年龄"
                     class="form-input age-input"
                     controls-position="right"
                   />
                 </el-form-item>
-                
-                <el-form-item label="国家" prop="country" class="form-item">
-                  <el-select 
-                    v-model="userForm.country" 
-                    placeholder="请选择您的国家"
-                    class="form-input"
-                    filterable
-                  >
-                    <template #prefix>
-                      <el-icon><Flag /></el-icon>
-                    </template>
-                    <el-option 
-                      v-for="country in availableCountries" 
-                      :key="country" 
-                      :label="country" 
-                      :value="country" 
-                    />
-                  </el-select>
+
+                <el-form-item label="阅读兴趣" class="form-item">
+                  <div class="interest-display">
+                    <div v-if="userInterests.length > 0" class="interest-tags">
+                      <el-tag
+                        v-for="interest in userInterests"
+                        :key="interest.themeId"
+                        closable
+                        @close="removeInterest(interest.themeId)"
+                        class="interest-tag"
+                      >
+                        {{ interest.themeNameZh }}
+                      </el-tag>
+                    </div>
+                    <p v-else class="no-interests">暂未选择阅读兴趣</p>
+                    <button
+                      type="button"
+                      @click="openInterestSelector"
+                      class="btn-edit-interests"
+                    >
+                      <el-icon><Edit /></el-icon>
+                      {{ userInterests.length > 0 ? '编辑兴趣' : '选择兴趣' }}
+                    </button>
+                  </div>
                 </el-form-item>
               </div>
             </div>
@@ -151,6 +145,27 @@
         </div>
       </div>
     </div>
+
+    <!-- 兴趣选择对话框 -->
+    <el-dialog
+      v-model="showInterestDialog"
+      :show-close="true"
+      width="95%"
+      :style="{ maxWidth: '960px' }"
+      :close-on-click-modal="false"
+    >
+      <InterestSelector
+        title="选择您的阅读兴趣"
+        :min-selection="0"
+        :random-count="5"
+        confirm-text="保存兴趣"
+        skip-text="取消"
+        :allow-skip="true"
+        :initial-selected="selectedInterestIds"
+        @confirm="handleInterestConfirm"
+        @skip="closeInterestDialog"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -159,54 +174,63 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useUserStore } from '../stores/user'
 import { userApi } from '../api/user'
 import { ElMessage } from 'element-plus'
-import { 
-  UserFilled, User, Message, LocationFilled, Flag, 
+import {
+  UserFilled, User, Edit,
   InfoFilled, Check, Loading, Refresh
 } from '@element-plus/icons-vue'
+import InterestSelector from '../components/InterestSelector.vue'
 
 const userStore = useUserStore()
 const userFormRef = ref()
 const loading = ref(false)
+const showInterestDialog = ref(false)
+const userInterests = ref([])
+const selectedInterestIds = ref([])
 
 const userForm = reactive({
   username: '',
   nickname: '',
-  email: '',
-  age: null,
-  country: ''
+  age: null
 })
-
-const availableCountries = ref([])
 
 const rules = {
   nickname: [
     { min: 2, max: 20, message: '昵称长度在 2 到 20 个字符', trigger: 'blur' }
   ],
-  email: [
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
-  ],
   age: [
     { required: true, message: '请输入年龄', trigger: 'blur' },
     { type: 'number', min: 1, max: 120, message: '年龄必须在 1-120 之间', trigger: 'blur' }
-  ],
-  country: [
-    { required: true, message: '请选择国家', trigger: 'change' }
   ]
 }
 
-// 计算资料完整度（删除location）
+// 计算资料完整度
 const profileCompleteness = computed(() => {
-  const requiredFields = ['age', 'country']
-  const completedFields = requiredFields.filter(field => {
+  const requiredFields = ['age']
+  const optionalFields = ['nickname']
+
+  const requiredCompleted = requiredFields.filter(field => {
     const value = userForm[field]
     return value !== null && value !== undefined && value !== ''
-  })
-  return Math.round((completedFields.length / requiredFields.length) * 100)
+  }).length
+
+  const optionalCompleted = optionalFields.filter(field => {
+    const value = userForm[field]
+    return value !== null && value !== undefined && value !== ''
+  }).length
+
+  const interestScore = userInterests.value.length > 0 ? 1 : 0
+
+  const totalRequired = requiredFields.length
+  const totalOptional = optionalFields.length + 1 // +1 for interests
+  const totalCompleted = requiredCompleted + optionalCompleted + interestScore
+  const totalFields = totalRequired + totalOptional
+
+  return Math.round((totalCompleted / totalFields) * 100)
 })
 
-// 是否显示资料不完整提示（删除location）
+// 是否显示资料不完整提示
 const showIncompleteAlert = computed(() => {
-  return !userForm.age || !userForm.country
+  return !userForm.age || userInterests.value.length === 0
 })
 
 const loadUserInfo = async () => {
@@ -214,35 +238,55 @@ const loadUserInfo = async () => {
     const user = userStore.user
     userForm.username = user.username || ''
     userForm.nickname = user.nickname || ''
-    userForm.email = user.email || ''
     userForm.age = user.age || null
-    userForm.country = user.country || ''
   }
 }
 
-const loadAvailableCountries = async () => {
-  try {
-    const response = await userApi.getAvailableCountries()
-    availableCountries.value = response.data || []
-  } catch (error) {
-    console.log('加载国家列表失败')
-    // 使用默认国家列表
-    availableCountries.value = ['USA', 'UK', 'Canada', 'Germany', 'France', 'Spain', 'Italy', 'Australia']
-  }
-}
-
-const loadUserRatings = async () => {
+const loadUserInterests = async () => {
   if (!userStore.user) return
-  
-  ratingsLoading.value = true
+
   try {
-    const response = await userApi.getUserRatings(userStore.user.userId)
-    userRatings.value = response.data || []
+    const response = await userApi.getUserInterests(userStore.user.userId)
+    userInterests.value = response.data || []
+    selectedInterestIds.value = userInterests.value.map(i => i.themeId)
   } catch (error) {
-    console.log('加载评分历史失败')
-    userRatings.value = []
-  } finally {
-    ratingsLoading.value = false
+    console.log('加载用户兴趣失败')
+    userInterests.value = []
+    selectedInterestIds.value = []
+  }
+}
+
+const openInterestSelector = () => {
+  showInterestDialog.value = true
+}
+
+const closeInterestDialog = () => {
+  showInterestDialog.value = false
+}
+
+const handleInterestConfirm = async (themeIds) => {
+  try {
+    await userApi.saveUserInterests(userStore.user.userId, themeIds)
+
+    // 重新加载兴趣列表
+    await loadUserInterests()
+
+    ElMessage.success('兴趣保存成功')
+    showInterestDialog.value = false
+  } catch (error) {
+    ElMessage.error('保存兴趣失败，请重试')
+  }
+}
+
+const removeInterest = async (themeId) => {
+  const updatedIds = selectedInterestIds.value.filter(id => id !== themeId)
+
+  try {
+    await userApi.saveUserInterests(userStore.user.userId, updatedIds)
+    await loadUserInterests()
+    ElMessage.success('已移除该兴趣')
+  } catch (error) {
+    ElMessage.error('移除失败，请重试')
   }
 }
 
@@ -255,41 +299,32 @@ const handleImageError = (event) => {
   event.target.src = '/default-book.jpg'
 }
 
-const viewAllRatings = () => {
-  // 可以跳转到专门的评分历史页面或展开显示
-  ElMessage.info('查看全部评分功能可以后续扩展')
-}
-
 const handleUpdate = async () => {
   if (!userFormRef.value) return
-  
+
   await userFormRef.value.validate(async (valid) => {
     if (valid) {
       loading.value = true
       try {
-        // 调用API更新用户信息
+        // 调用API更新用户信息（删除location）
         await userApi.updateUserInfo(userStore.user.userId, {
           nickname: userForm.nickname,
-          email: userForm.email,
-          age: userForm.age,
-          country: userForm.country
+          age: userForm.age
         })
-        
+
         // 更新本地用户信息
         userStore.setUser({
           ...userStore.user,
           nickname: userForm.nickname,
-          email: userForm.email,
-          age: userForm.age,
-          country: userForm.country
+          age: userForm.age
         })
-        
+
         ElMessage.success({
           message: '个人信息更新成功！',
           duration: 3000,
           showClose: true
         })
-        
+
         // 如果资料现在完整了，给予提示
         if (profileCompleteness.value === 100) {
           setTimeout(() => {
@@ -300,7 +335,7 @@ const handleUpdate = async () => {
             })
           }, 1000)
         }
-        
+
       } catch (error) {
         ElMessage.error({
           message: '更新失败，请重试',
@@ -321,7 +356,7 @@ const resetForm = () => {
 
 onMounted(() => {
   loadUserInfo()
-  loadAvailableCountries()
+  loadUserInterests()
 })
 </script>
 
@@ -352,10 +387,10 @@ onMounted(() => {
 }
 
 .user-avatar {
-  background: #007aff;
+  background: #5ac8fa;
   color: white;
   font-size: 2rem;
-  box-shadow: 0 4px 20px rgba(0, 122, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(90, 200, 250, 0.2);
 }
 
 .user-basic-info {
@@ -386,8 +421,8 @@ onMounted(() => {
 
 /* 资料完善提示 */
 .alert-card {
-  background: rgba(0, 122, 255, 0.05);
-  border: 1px solid rgba(0, 122, 255, 0.15);
+  background: rgba(90, 200, 250, 0.05);
+  border: 1px solid rgba(90, 200, 250, 0.15);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 32px;
@@ -401,7 +436,7 @@ onMounted(() => {
 
 .alert-icon {
   font-size: 1.5rem;
-  color: #007aff;
+  color: #5ac8fa;
   margin-top: 2px;
 }
 
@@ -505,12 +540,12 @@ onMounted(() => {
 }
 
 .form-input :deep(.el-input__wrapper):hover {
-  border-color: #007aff;
+  border-color: #5ac8fa;
 }
 
 .form-input :deep(.el-input__wrapper.is-focus) {
-  border-color: #007aff;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+  border-color: #5ac8fa;
+  box-shadow: 0 0 0 3px rgba(90, 200, 250, 0.1);
 }
 
 .form-input :deep(.el-input__prefix) {
@@ -550,7 +585,7 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background: #007aff;
+  background: #5ac8fa;
   color: white;
   border: none;
   border-radius: 12px;
@@ -562,13 +597,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.3);
+  box-shadow: 0 4px 14px rgba(90, 200, 250, 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: #0056cc;
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
+  box-shadow: 0 6px 20px rgba(90, 200, 250, 0.4);
 }
 
 .btn-primary:disabled {
@@ -608,6 +643,89 @@ onMounted(() => {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* 兴趣展示区域 */
+.interest-display {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.interest-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.interest-tag {
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(90, 200, 250, 0.1);
+  border: 1px solid rgba(90, 200, 250, 0.2);
+  color: #5ac8fa;
+}
+
+.no-interests {
+  font-size: 0.9rem;
+  color: #86868b;
+  margin: 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.btn-edit-interests {
+  background: rgba(90, 200, 250, 0.08);
+  color: #5ac8fa;
+  border: 1px solid rgba(90, 200, 250, 0.2);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+}
+
+.btn-edit-interests:hover {
+  background: rgba(90, 200, 250, 0.15);
+  transform: translateY(-1px);
+}
+
+/* 对话框样式调整 - 无标题栏 */
+:deep(.el-dialog) {
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+:deep(.el-dialog__header) {
+  display: none;
+}
+
+:deep(.el-dialog__body) {
+  padding: 0;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+:deep(.el-dialog__close) {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
+  color: #86868b;
+  font-size: 1.25rem;
+}
+
+:deep(.el-dialog__close:hover) {
+  color: #1d1d1f;
 }
 
 /* 响应式设计 */

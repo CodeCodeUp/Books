@@ -33,8 +33,10 @@ public class Book {
     private BigDecimal avgRating;
     
     private Integer ratingCount;
-    
+
+    private Integer themeId;
+
     private LocalDateTime createdAt;
-    
+
     private LocalDateTime updatedAt;
 }

@@ -23,16 +23,16 @@
       
       <el-form :inline="true" :model="recommendForm" class="recommend-form">
         <el-form-item label="推荐数量">
-          <el-select v-model="recommendForm.topN" placeholder="选择推荐数量">
+          <el-select v-model="recommendForm.topN">
             <el-option label="5本" :value="5" />
             <el-option label="10本" :value="10" />
             <el-option label="15本" :value="15" />
             <el-option label="20本" :value="20" />
           </el-select>
         </el-form-item>
-        
+
         <el-form-item label="最低评分">
-          <el-select v-model="recommendForm.minRating" placeholder="最低评分">
+          <el-select v-model="recommendForm.minRating">
             <el-option label="2.0分以上" :value="2.0" />
             <el-option label="3.0分以上" :value="3.0" />
             <el-option label="3.5分以上" :value="3.5" />

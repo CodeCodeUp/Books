@@ -1,108 +1,101 @@
 <template>
-  <div class="auth-container">
-    <!-- 主要内容 -->
-    <div class="auth-content">
-      <div class="auth-wrapper">
-        <!-- 左侧装饰区域 -->
-        <div class="auth-left">
-          <div class="welcome-section">
-            <h1 class="welcome-title">开始阅读</h1>
-            <p class="welcome-subtitle">注册账户，开启个性化阅读之旅</p>
-            <div class="feature-list">
-              <div class="feature-item">
-                <el-icon class="feature-icon"><Star /></el-icon>
-                <span>智能推荐算法</span>
-              </div>
-              <div class="feature-item">
-                <el-icon class="feature-icon"><CollectionTag /></el-icon>
-                <span>27万+精选图书</span>
-              </div>
-              <div class="feature-item">
-                <el-icon class="feature-icon"><UserFilled /></el-icon>
-                <span>个性化阅读体验</span>
-              </div>
+  <div class="register-container">
+    <div class="register-wrapper">
+      <!-- 左侧装饰区域 -->
+      <div class="register-left">
+        <div class="welcome-section">
+          <h1 class="welcome-title">开始阅读</h1>
+          <p class="welcome-subtitle">注册账户，开启个性化阅读之旅</p>
+          <div class="feature-list">
+            <div class="feature-item">
+              <el-icon class="feature-icon"><Star /></el-icon>
+              <span>智能推荐算法</span>
+            </div>
+            <div class="feature-item">
+              <el-icon class="feature-icon"><CollectionTag /></el-icon>
+              <span>27万+精选图书</span>
+            </div>
+            <div class="feature-item">
+              <el-icon class="feature-icon"><UserFilled /></el-icon>
+              <span>个性化阅读体验</span>
             </div>
           </div>
         </div>
-        
-        <!-- 右侧注册表单 -->
-        <div class="auth-right">
-          <div class="auth-card">
-            <div class="card-header">
-              <div class="logo-section">
-                <el-icon class="logo-icon"><Reading /></el-icon>
-                <h2 class="auth-title">用户注册</h2>
-              </div>
-              <p class="auth-subtitle">创建您的图书推荐系统账户</p>
-            </div>
-            
-            <el-form 
-              :model="registerForm" 
-              :rules="rules" 
-              ref="registerFormRef"
-              class="auth-form"
-              size="large"
-            >
-              <el-form-item prop="username" class="form-item">
-                <el-input
-                  v-model="registerForm.username"
-                  placeholder="请输入用户名"
-                  class="form-input"
-                >
-                  <template #prefix>
-                    <el-icon class="input-icon"><User /></el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              
-              <el-form-item prop="password" class="form-item">
-                <el-input
-                  v-model="registerForm.password"
-                  type="password"
-                  placeholder="请输入密码"
-                  show-password
-                  class="form-input"
-                >
-                  <template #prefix>
-                    <el-icon class="input-icon"><Lock /></el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              
-              <el-form-item prop="confirmPassword" class="form-item">
-                <el-input
-                  v-model="registerForm.confirmPassword"
-                  type="password"
-                  placeholder="请确认密码"
-                  show-password
-                  class="form-input"
-                >
-                  <template #prefix>
-                    <el-icon class="input-icon"><Lock /></el-icon>
-                  </template>
-                </el-input>
-              </el-form-item>
-              
-              <el-form-item class="form-item">
-                <button 
-                  type="button"
-                  :disabled="loading"
-                  @click="handleRegister"
-                  class="auth-btn"
-                >
-                  <span v-if="!loading">立即注册</span>
-                  <span v-else>注册中...</span>
-                </button>
-              </el-form-item>
-              
-              <div class="auth-footer">
-                <span class="footer-text">已有账号？</span>
-                <router-link to="/login" class="register-link">
-                  立即登录
-                </router-link>
-              </div>
-            </el-form>
+      </div>
+
+      <!-- 右侧注册表单 -->
+      <div class="register-right">
+        <div class="register-card">
+          <div class="card-header">
+            <h2 class="auth-title">创建账户</h2>
+            <p class="auth-subtitle">请输入您的账户信息</p>
           </div>
+
+          <el-form
+            :model="registerForm"
+            :rules="rules"
+            ref="registerFormRef"
+            class="auth-form"
+            size="large"
+          >
+            <el-form-item prop="username" class="form-item">
+              <el-input
+                v-model="registerForm.username"
+                placeholder="请输入用户名"
+                class="form-input"
+              >
+                <template #prefix>
+                  <el-icon class="input-icon"><User /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+
+            <el-form-item prop="password" class="form-item">
+              <el-input
+                v-model="registerForm.password"
+                type="password"
+                placeholder="请输入密码"
+                show-password
+                class="form-input"
+              >
+                <template #prefix>
+                  <el-icon class="input-icon"><Lock /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+
+            <el-form-item prop="confirmPassword" class="form-item">
+              <el-input
+                v-model="registerForm.confirmPassword"
+                type="password"
+                placeholder="请确认密码"
+                show-password
+                class="form-input"
+              >
+                <template #prefix>
+                  <el-icon class="input-icon"><Lock /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+
+            <el-form-item class="form-item">
+              <button
+                type="button"
+                @click="handleRegister"
+                :disabled="loading"
+                class="auth-btn"
+              >
+                {{ loading ? '注册中...' : '注册' }}
+              </button>
+            </el-form-item>
+
+            <div class="auth-footer">
+              <span class="footer-text">已有账号？</span>
+              <router-link to="/login" class="register-link">
+                立即登录
+              </router-link>
+            </div>
+          </el-form>
         </div>
       </div>
     </div>
@@ -112,13 +105,15 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '../stores/user'
 import { userApi } from '../api/user'
 import { ElMessage } from 'element-plus'
-import { 
-  User, Lock, Star, CollectionTag, UserFilled, Reading 
+import {
+  User, Lock, Star, CollectionTag, UserFilled
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const userStore = useUserStore()
 const registerFormRef = ref()
 const loading = ref(false)
 
@@ -152,46 +147,54 @@ const rules = {
 }
 
 const handleRegister = async () => {
-  if (!registerFormRef.value) return
-  
-  await registerFormRef.value.validate(async (valid) => {
-    if (valid) {
-      loading.value = true
-      try {
-        await userApi.register(registerForm.username, registerForm.password, null)
-        
-        ElMessage.success('注册成功，请登录')
-        router.push('/login')
-      } catch (error) {
-        ElMessage.error('注册失败')
-      } finally {
-        loading.value = false
-      }
-    }
-  })
+  const valid = await registerFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+
+  loading.value = true
+  try {
+    const response = await userApi.register(
+      registerForm.username,
+      registerForm.password,
+      null
+    )
+
+    // 后端现在返回 { user, token }
+    const { user, token } = response.data
+
+    // 保存用户信息和 token
+    userStore.setUser(user)
+    userStore.setToken(token)
+
+    ElMessage.success({
+      message: '注册成功！请完善您的个人信息',
+      duration: 2000
+    })
+
+    // 跳转到完善资料页面
+    setTimeout(() => {
+      router.push('/complete-profile')
+    }, 1000)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '注册失败，用户名可能已存在')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
 <style scoped>
-/* 苹果风格认证页面 */
-.auth-container {
+/* 注册容器 */
+.register-container {
   min-height: 100vh;
-  position: relative;
   background: #fafafa;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-/* 主要内容 */
-.auth-content {
-  position: relative;
-  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
 }
 
-.auth-wrapper {
+.register-wrapper {
   display: grid;
   grid-template-columns: 1fr 1fr;
   max-width: 1200px;
@@ -201,7 +204,7 @@ const handleRegister = async () => {
 }
 
 /* 左侧装饰区域 */
-.auth-left {
+.register-left {
   padding: 40px;
   background: linear-gradient(135deg, #34c759 0%, #30b47a 100%);
   border-radius: 24px;
@@ -264,15 +267,15 @@ const handleRegister = async () => {
   font-weight: 500;
 }
 
-/* 右侧认证表单 */
-.auth-right {
+/* 右侧注册表单 */
+.register-right {
   display: flex;
   justify-content: center;
 }
 
-.auth-card {
+.register-card {
   width: 100%;
-  max-width: 400px;
+  max-width: 450px;
   background: white;
   border-radius: 20px;
   padding: 40px;
@@ -285,24 +288,11 @@ const handleRegister = async () => {
   margin-bottom: 32px;
 }
 
-.logo-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.logo-icon {
-  font-size: 2.5rem;
-  color: #34c759;
-}
-
 .auth-title {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: #1d1d1f;
-  margin: 0;
+  margin: 0 0 8px 0;
   letter-spacing: -0.02em;
 }
 
@@ -349,17 +339,7 @@ const handleRegister = async () => {
   font-size: 1.1rem;
 }
 
-.form-input :deep(.el-input__inner) {
-  font-size: 16px;
-  color: #1d1d1f;
-  font-weight: 400;
-}
-
-.form-input :deep(.el-input__inner::placeholder) {
-  color: #86868b;
-}
-
-/* 认证按钮 */
+/* 按钮 */
 .auth-btn {
   width: 100%;
   height: 52px;
@@ -411,29 +391,29 @@ const handleRegister = async () => {
   text-decoration: underline;
 }
 
-/* 响应式设计 */
+/* 响应式 */
 @media (max-width: 1024px) {
-  .auth-wrapper {
+  .register-wrapper {
     grid-template-columns: 1fr;
     gap: 40px;
     max-width: 500px;
   }
-  
-  .auth-left {
+
+  .register-left {
     padding: 32px;
     order: 2;
   }
-  
+
   .welcome-title {
     font-size: 2.5rem;
   }
-  
+
   .feature-list {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
   }
-  
+
   .feature-item {
     min-width: 200px;
     padding: 10px 16px;
@@ -441,54 +421,25 @@ const handleRegister = async () => {
 }
 
 @media (max-width: 768px) {
-  .auth-content {
+  .register-container {
     padding: 16px;
   }
-  
-  .auth-card {
+
+  .register-card {
     padding: 32px 24px;
   }
-  
+
   .welcome-title {
     font-size: 2rem;
   }
-  
+
   .feature-list {
     flex-direction: column;
   }
-  
+
   .feature-item {
     min-width: auto;
     width: 100%;
-  }
-  
-  .form-input :deep(.el-input__wrapper) {
-    height: 48px;
-    padding: 14px;
-  }
-  
-  .auth-btn {
-    height: 48px;
-  }
-}
-
-@media (max-width: 480px) {
-  .auth-card {
-    margin: 0 8px;
-    padding: 24px 20px;
-  }
-  
-  .welcome-title {
-    font-size: 1.8rem;
-  }
-  
-  .feature-item {
-    padding: 10px 16px;
-    font-size: 0.85rem;
-  }
-  
-  .auth-title {
-    font-size: 1.5rem;
   }
 }
 </style>
