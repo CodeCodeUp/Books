@@ -390,179 +390,287 @@ class ContentBasedRecommendation:
             return 0.0
 
     def _get_user_basic_info(self, user_id):
-        """获取用户基础信息"""
+        """
+        获取用户基础信息（年龄 + 兴趣）
+
+        返回:
+            dict: {
+                'user_id': int,
+                'age': int or None,
+                'age_group': str or None,
+                'interests': list[int]  # 兴趣主题ID列表
+            }
+        """
         try:
+            # 获取用户基本信息
             user_query = """
-            SELECT user_id, age, country, age_group
-            FROM users 
+            SELECT user_id, age, age_group
+            FROM users
             WHERE user_id = %(user_id)s
             """
-            
+
             user_df = pd.read_sql(user_query, self.data_loader.engine, params={'user_id': user_id})
-            
+
             if user_df.empty:
                 return None
-            
-            return user_df.iloc[0].to_dict()
-            
+
+            user_info = user_df.iloc[0].to_dict()
+
+            # 获取用户兴趣列表
+            user_info['interests'] = self.data_loader.get_user_interests(user_id)
+
+            return user_info
+
         except Exception as e:
             logger.error(f"获取用户信息失败: {e}")
             return None
-    
+
     def _has_valid_user_features(self, user_info):
-        """检查用户是否有有效的特征信息"""
-        return (
-            (user_info.get('age') is not None and user_info.get('age') > 0) or
-            (user_info.get('country') is not None and str(user_info.get('country')).strip() != '')
-        )
+        """
+        检查用户是否有有效的特征信息（年龄或兴趣）
+
+        优先级：兴趣 > 年龄（用户主动选择的偏好更重要）
+        """
+        if not user_info:
+            return False
+
+        has_age = user_info.get('age') is not None and user_info.get('age') > 0
+        has_interests = bool(user_info.get('interests'))
+
+        return has_age or has_interests
+
+    def has_user_interests(self, user_info):
+        """检查用户是否选择了兴趣"""
+        return bool(user_info and user_info.get('interests'))
     
     def _recommend_by_user_features(self, user_info, user_id, top_n):
-        """基于用户特征推荐图书"""
+        """
+        基于用户特征推荐图书
+
+        优先级策略（方案A）：
+        1. 兴趣优先：如果用户选择了兴趣，优先推荐兴趣主题的图书
+        2. 年龄辅助：如果用户有年龄信息，作为辅助排序条件
+        3. 质量兜底：如果兴趣推荐不足，用高质量图书补充
+        """
         try:
-            recommendations = []
-            
-            # 获取用户已评分的图书（重要：必须排除）
+            # 获取用户已评分的图书（必须排除）
             user_rated_books = set()
             if user_id:
                 user_ratings = self.ratings_df[self.ratings_df['user_id'] == user_id]
                 user_rated_books = set(user_ratings['book_id'].values)
-            
-            # 获取高质量图书池（排除用户已评分的）
+
+            logger.info(f"用户 {user_id} 已评分图书: {len(user_rated_books)} 本")
+
+            # 检查是否有兴趣
+            user_interests = user_info.get('interests', [])
+
+            if user_interests:
+                # 优先使用兴趣推荐
+                logger.info(f"用户选择了 {len(user_interests)} 个兴趣主题，使用兴趣推荐")
+                recommendations = self._recommend_by_interests(
+                    user_id, user_interests, user_rated_books, user_info, top_n
+                )
+
+                if len(recommendations) >= top_n:
+                    return recommendations[:top_n]
+
+                # 兴趣推荐不足，用年龄偏好补充
+                logger.info(f"兴趣推荐 {len(recommendations)} 个，不足 {top_n}，尝试年龄偏好补充")
+                if user_info.get('age'):
+                    age_recs = self._recommend_by_age(user_id, user_info, user_rated_books, top_n - len(recommendations))
+                    # 去重
+                    existing_ids = {r['bookId'] for r in recommendations}
+                    for rec in age_recs:
+                        if rec['bookId'] not in existing_ids:
+                            recommendations.append(rec)
+                            if len(recommendations) >= top_n:
+                                break
+
+                return recommendations[:top_n]
+
+            elif user_info.get('age'):
+                # 只有年龄，使用年龄偏好推荐
+                logger.info("用户只有年龄信息，使用年龄偏好推荐")
+                return self._recommend_by_age(user_id, user_info, user_rated_books, top_n)
+
+            else:
+                # 无特征，返回高质量图书
+                logger.info("用户无有效特征，返回高质量图书")
+                return self._get_top_quality_books_excluding_rated(user_id, top_n)
+
+        except Exception as e:
+            logger.error(f"基于用户特征推荐失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return self._get_top_quality_books(top_n)
+
+    def _recommend_by_interests(self, user_id, interest_ids, exclude_book_ids, user_info, top_n):
+        """
+        基于用户兴趣主题推荐图书
+
+        核心逻辑：
+        1. 根据 user_interests 中的 theme_id 匹配 books 表的 theme_id
+        2. 按评分和评分人数排序
+        3. 排除用户已评分的图书
+        """
+        logger.info(f"基于兴趣推荐: 兴趣主题ID = {interest_ids}")
+
+        try:
+            # 使用 data_loader 获取符合主题的图书
+            interest_books = self.data_loader.get_books_by_themes(
+                theme_ids=interest_ids,
+                exclude_book_ids=exclude_book_ids,
+                limit=top_n * 2
+            )
+
+            if interest_books.empty:
+                logger.warning("未找到符合用户兴趣的图书")
+                return []
+
+            logger.info(f"找到 {len(interest_books)} 本符合兴趣的图书")
+
+            # 构建推荐结果
+            recommendations = []
+            user_age = user_info.get('age')
+
+            for _, book in interest_books.iterrows():
+                # 计算匹配分数（兴趣匹配 + 年龄偏好加成）
+                match_score = 0.7  # 兴趣基础分
+
+                # 年龄偏好加成
+                if user_age and pd.notna(book.get('year')):
+                    age_bonus = self._calculate_age_preference_score(user_age, book['year'])
+                    match_score += 0.3 * age_bonus
+
+                recommendations.append({
+                    'bookId': book['book_id'],
+                    'title': book['title'],
+                    'author': book['author'] or '未知作者',
+                    'publisher': book.get('publisher', '') or '',
+                    'year': int(book['year']) if pd.notna(book.get('year')) else None,
+                    'imageUrlS': book.get('image_url_s', ''),
+                    'imageUrlM': book.get('image_url_m', ''),
+                    'imageUrlL': book.get('image_url_l', ''),
+                    'avgRating': round(float(book['avg_rating']), 2),
+                    'ratingCount': int(book['rating_count']),
+                    'content_score': round(match_score, 3),
+                    'algorithm': 'interest_based',
+                    'reason': '根据您选择的兴趣主题推荐'
+                })
+
+            # 按匹配分数排序
+            recommendations.sort(key=lambda x: (x['content_score'], x['avgRating']), reverse=True)
+
+            logger.info(f"兴趣推荐生成 {len(recommendations[:top_n])} 个结果")
+            return recommendations[:top_n]
+
+        except Exception as e:
+            logger.error(f"基于兴趣推荐失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+
+    def _recommend_by_age(self, user_id, user_info, exclude_book_ids, top_n):
+        """
+        基于用户年龄偏好推荐图书
+
+        年龄偏好规则：
+        - 青少年(<18): 偏好2005年后的新书
+        - 年轻人(18-24): 偏好2000年后的现代书籍
+        - 青年(25-34): 偏好1990年后的当代文学
+        - 中年(35-44): 偏好1980年后的成熟作品
+        - 中老年(45-54): 偏好经典文学
+        - 老年(55+): 偏好传统经典
+        """
+        logger.info(f"基于年龄推荐: 年龄 = {user_info.get('age')}")
+
+        try:
+            user_age = user_info.get('age')
+
+            # 获取高质量图书池
             quality_books = self.books_df[
                 (self.books_df['rating_count'] >= 5) &
                 (self.books_df['avg_rating'] >= 3.5) &
-                (~self.books_df['book_id'].isin(user_rated_books))  # 关键：排除已评分图书
+                (~self.books_df['book_id'].isin(exclude_book_ids))
             ].copy()
-            
-            logger.info(f"候选图书池: {len(quality_books)} 本（已排除用户已评分的 {len(user_rated_books)} 本）")
-            
-            # 为每本书计算与用户特征的匹配度
-            for idx, book in quality_books.iterrows():
-                match_score = self._calculate_user_book_match(user_info, book)
-                
-                if match_score > 0.1:  # 匹配度阈值
+
+            if quality_books.empty:
+                return []
+
+            # 计算年龄偏好分数
+            recommendations = []
+
+            for _, book in quality_books.iterrows():
+                if pd.notna(book.get('year')):
+                    age_score = self._calculate_age_preference_score(user_age, book['year'])
+                else:
+                    age_score = 0.5  # 无年份信息默认分数
+
+                # 综合评分 = 年龄偏好 * 0.5 + 图书质量 * 0.5
+                quality_score = (float(book['avg_rating']) / 5.0 + min(1.0, book['rating_count'] / 100)) / 2
+                match_score = 0.5 * age_score + 0.5 * quality_score
+
+                if match_score > 0.3:
                     recommendations.append({
                         'bookId': book['book_id'],
                         'title': book['title'],
                         'author': book['author'] or '未知作者',
                         'publisher': book.get('publisher', '') or '',
-                        'year': int(book['year']) if pd.notna(book['year']) else None,
+                        'year': int(book['year']) if pd.notna(book.get('year')) else None,
                         'imageUrlS': book.get('image_url_s', ''),
                         'imageUrlM': book.get('image_url_m', ''),
                         'imageUrlL': book.get('image_url_l', ''),
                         'avgRating': round(float(book['avg_rating']), 2),
                         'ratingCount': int(book['rating_count']),
                         'content_score': round(match_score, 3),
-                        'algorithm': 'content_based_user_profile',
-                        'reason': self._generate_recommendation_reason(user_info, book, match_score)
+                        'algorithm': 'age_based',
+                        'reason': self._get_age_recommendation_reason(user_age)
                     })
-            
-            # 按匹配度排序
+
+            # 按匹配分数排序
             recommendations.sort(key=lambda x: x['content_score'], reverse=True)
-            
+
             return recommendations[:top_n]
-            
+
         except Exception as e:
-            logger.error(f"基于用户特征推荐失败: {e}")
-            return self._get_top_quality_books(top_n)
-    
-    def _calculate_user_book_match(self, user_info, book):
-        """计算用户特征与图书的匹配度"""
+            logger.error(f"基于年龄推荐失败: {e}")
+            return []
+
+    def _calculate_age_preference_score(self, user_age, book_year):
+        """计算用户年龄与图书年代的匹配分数"""
         try:
-            score = 0.0
-            
-            # 1. 年龄组匹配 (权重50%)
-            user_age_group = user_info.get('age_group')
-            user_age = user_info.get('age')
-            
-            if user_age_group or user_age:
-                book_year = book.get('year')
-                if pd.notna(book_year):
-                    # 基于年龄组的图书年代偏好
-                    if user_age_group == 'Under 18' or (user_age and user_age < 18):
-                        age_score = 1.0 if book_year >= 2005 else 0.6  # 青少年偏好新书
-                    elif user_age_group == '18-24' or (user_age and 18 <= user_age < 25):
-                        age_score = 1.0 if book_year >= 2000 else 0.7  # 年轻人偏好现代书籍
-                    elif user_age_group == '25-34' or (user_age and 25 <= user_age < 35):
-                        age_score = 1.0 if book_year >= 1990 else 0.8  # 青年偏好当代文学
-                    elif user_age_group == '35-44' or (user_age and 35 <= user_age < 45):
-                        age_score = 1.0 if book_year >= 1980 else 0.9  # 中年偏好成熟作品
-                    elif user_age_group == '45-54' or (user_age and 45 <= user_age < 55):
-                        age_score = 1.0 if book_year >= 1970 else 0.9  # 偏好经典文学
-                    elif user_age_group == '55+' or (user_age and user_age >= 55):
-                        age_score = 1.0 if book_year <= 1990 else 0.8  # 老年偏好传统经典
-                    else:
-                        age_score = 0.5  # 未知年龄组默认分数
-                    
-                    score += 0.5 * age_score
-            
-            # 2. 国家/文化匹配 (权重30%) - 安全的字符串处理
-            try:
-                user_country = user_info.get('country')
-                user_country = str(user_country).lower() if user_country else ''
-                
-                book_title = book.get('title')
-                book_title = str(book_title).lower() if book_title else ''
-                
-                book_author = book.get('author')  
-                book_author = str(book_author).lower() if book_author else ''
-                
-                if user_country:
-                    # 简单的文化匹配规则
-                    if user_country in ['usa', 'united states', 'canada', 'uk', 'united kingdom', 'australia']:
-                        # 英语国家用户偏好英语作品
-                        if any(name in book_author for name in ['john', 'david', 'michael', 'james', 'robert', 'william', 'thomas']):
-                            score += 0.3 * 0.8
-                    elif user_country in ['germany', 'france', 'spain', 'italy', 'netherlands']:
-                        # 欧洲用户偏好欧洲文学
-                        if any(word in book_title for word in ['europe', 'paris', 'london', 'berlin', 'rome']):
-                            score += 0.3 * 0.8
-                    else:
-                        # 其他国家用户偏好国际经典
-                        score += 0.3 * 0.5
-            except Exception as e:
-                # 字符串处理失败，跳过文化匹配
-                pass
-            
-            # 3. 图书质量评分 (权重20%)
-            try:
-                avg_rating = book.get('avg_rating') or 0
-                rating_count = book.get('rating_count') or 0
-                
-                quality_score = float(avg_rating) / 5.0
-                popularity_score = min(1.0, int(rating_count) / 100)
-                combined_quality = (quality_score + popularity_score) / 2
-                score += 0.2 * combined_quality
-            except Exception as e:
-                # 质量评分计算失败，跳过
-                pass
-            
-            return score
-            
-        except Exception as e:
-            logger.error(f"计算用户图书匹配度失败: {e}")
-            return 0.0
-    
-    def _generate_recommendation_reason(self, user_info, book, match_score):
-        """生成推荐理由"""
-        reasons = []
-        
-        user_age = user_info.get('age')
-        if user_age:
-            if user_age < 25:
-                reasons.append("适合年轻读者")
-            elif user_age > 40:
-                reasons.append("适合成熟读者")
-        
-        user_country = user_info.get('country')
-        if user_country:
-            reasons.append(f"推荐给{user_country}读者")
-        
-        book_rating = book.get('avg_rating', 0)
-        if book_rating >= 4.0:
-            reasons.append("高评分优质图书")
-        
-        return "、".join(reasons) if reasons else f"内容特征匹配度{match_score:.2f}"
+            book_year = int(book_year)
+
+            if user_age < 18:
+                return 1.0 if book_year >= 2005 else 0.6
+            elif 18 <= user_age < 25:
+                return 1.0 if book_year >= 2000 else 0.7
+            elif 25 <= user_age < 35:
+                return 1.0 if book_year >= 1990 else 0.8
+            elif 35 <= user_age < 45:
+                return 1.0 if book_year >= 1980 else 0.9
+            elif 45 <= user_age < 55:
+                return 1.0 if book_year >= 1970 else 0.9
+            else:  # 55+
+                return 1.0 if book_year <= 1990 else 0.8
+
+        except (ValueError, TypeError):
+            return 0.5
+
+    def _get_age_recommendation_reason(self, user_age):
+        """根据年龄生成推荐理由"""
+        if user_age < 18:
+            return "适合青少年读者的新书推荐"
+        elif 18 <= user_age < 25:
+            return "适合年轻读者的现代书籍"
+        elif 25 <= user_age < 35:
+            return "适合青年读者的当代文学"
+        elif 35 <= user_age < 45:
+            return "适合成熟读者的优质作品"
+        elif 45 <= user_age < 55:
+            return "经典文学推荐"
+        else:
+            return "传统经典作品推荐"
     
     def _get_top_quality_books_excluding_rated(self, user_id, top_n):
         """获取优质图书推荐（排除用户已评分的）"""

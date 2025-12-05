@@ -58,69 +58,35 @@ class HybridRecommendation:
             user_ratings = self.user_cf.ratings_df[self.user_cf.ratings_df['user_id'] == user_id]
             has_ratings = not user_ratings.empty
 
-            # 2. 检查用户是否有基础特征信息
+            # 2. 检查用户是否有基础特征信息（年龄或兴趣）
             user_info = self.content_cf._get_user_basic_info(user_id)
             has_features = user_info and self.content_cf._has_valid_user_features(user_info)
-            
-            logger.info(f"用户状态: 有评分历史={has_ratings}, 有特征信息={has_features}")
-            
+
+            # 详细记录用户特征状态
+            if user_info:
+                has_interests = bool(user_info.get('interests'))
+                has_age = user_info.get('age') is not None and user_info.get('age') > 0
+                logger.info(f"用户状态: 有评分历史={has_ratings}, 有兴趣={has_interests}, 有年龄={has_age}")
+            else:
+                logger.info(f"用户状态: 有评分历史={has_ratings}, 无用户信息")
+
             # 3. 根据用户状态决定推荐策略
             if has_ratings and has_features:
-                # 情况1: 既有评分又有特征 - 动态比例混合推荐（使用TF-IDF内容特征）
-                logger.info("用户有评分历史和特征信息，使用动态比例混合推荐（TF-IDF）")
+                # 情况1: 既有评分又有特征 - 检查是否有兴趣
+                has_interests = bool(user_info.get('interests'))
 
-                # 获取协同过滤推荐（同时获取相似用户数据）
-                cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
-                logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
-
-                # 使用TF-IDF内容特征推荐（基于评分历史）
-                content_recommendations = self.content_cf.get_content_based_recommendations(user_id, top_n * 2)
-                logger.info(f"TF-IDF内容特征结果: {len(content_recommendations)} 个推荐")
-
-                if cf_recommendations and content_recommendations:
-                    # 动态计算混合比例（核心创新点）
-                    dynamic_cf_ratio, dynamic_content_ratio, confidence_info = self._calculate_dynamic_cf_ratio(
-                        similar_users, user_rating_count
-                    )
-
-                    logger.info(
-                        f"[动态混合推荐] "
-                        f"协同过滤={dynamic_cf_ratio:.1%}, "
-                        f"内容特征={dynamic_content_ratio:.1%} | "
-                        f"置信度={confidence_info.get('confidence_score', 'N/A')}"
-                    )
-
-                    # 使用动态比例执行混合
-                    mixed_result = self._mix_recommendations(
-                        cf_recommendations,
-                        content_recommendations,
-                        dynamic_cf_ratio,  # 使用动态计算的比例
-                        top_n
-                    )
-
-                    # 为每个推荐添加置信度信息（用于前端展示和论文分析）
-                    for rec in mixed_result:
-                        rec['mixing_strategy'] = 'dynamic_confidence_based'
-                        rec['cf_ratio'] = round(dynamic_cf_ratio, 2)
-                        rec['confidence_score'] = confidence_info.get('confidence_score')
-
-                    logger.info(f"动态混合推荐完成: {len(mixed_result)} 个推荐")
-                    return mixed_result
-                elif cf_recommendations:
-                    logger.info("只有协同过滤有结果，使用协同过滤推荐")
-                    return cf_recommendations[:top_n]
-                elif content_recommendations:
-                    logger.info("只有TF-IDF内容特征有结果，使用内容特征推荐")
-                    return content_recommendations[:top_n]
+                if has_interests:
+                    # 有兴趣：使用三层混合推荐（CF + TF-IDF + 兴趣加权）
+                    logger.info("用户有评分历史和兴趣，使用三层混合推荐（CF + TF-IDF + 兴趣加权）")
+                    return self._get_triple_hybrid_recommendations(user_id, user_info, top_n)
                 else:
-                    logger.warning("两种算法都无结果，使用降级推荐")
-                    fallback_result = self._get_fallback_recommendations(top_n)
-                    logger.info(f"降级推荐: {len(fallback_result)} 个推荐")
-                    return fallback_result
+                    # 只有年龄：使用双层混合推荐（CF + TF-IDF）
+                    logger.info("用户有评分历史和年龄（无兴趣），使用双层混合推荐（CF + TF-IDF）")
+                    return self._get_dual_hybrid_recommendations(user_id, top_n)
 
             elif has_ratings:
-                # 情况2: 有评分无特征 - 协同过滤 + TF-IDF内容特征混合（新增能力！）
-                logger.info("用户有评分历史但无特征信息，使用协同过滤 + TF-IDF内容特征混合")
+                # 情况2: 有评分无特征 - 协同过滤 + TF-IDF内容特征混合
+                logger.info("用户有评分历史但无特征信息（年龄/兴趣），使用协同过滤 + TF-IDF内容特征混合")
 
                 cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
                 logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
@@ -166,25 +132,235 @@ class HybridRecommendation:
                     fallback_result = self._get_fallback_recommendations(top_n)
                     logger.info(f"降级推荐: {len(fallback_result)} 个推荐")
                     return fallback_result
-                
+
             elif has_features:
-                # 情况3: 有特征无评分 - 基于用户特征推荐
-                logger.info("用户有特征信息但无评分历史，使用基于特征的内容推荐")
+                # 情况3: 有特征无评分 - 基于用户特征推荐（兴趣优先，年龄辅助）
+                logger.info("用户有特征信息（年龄/兴趣）但无评分历史，使用基于特征的推荐")
                 content_result = self.content_cf._recommend_by_user_features(user_info, user_id, top_n)
                 logger.info(f"基于用户特征推荐: {len(content_result)} 个推荐")
                 return content_result
-                
+
             else:
                 # 情况4: 既无评分又无特征 - 优质热门图书
-                logger.info("用户既无评分历史又无特征信息，返回优质热门图书")
+                logger.info("用户既无评分历史又无特征信息（年龄/兴趣），返回优质热门图书")
                 fallback_result = self._get_fallback_recommendations(top_n)
                 logger.info(f"优质热门图书推荐: {len(fallback_result)} 个推荐")
                 return fallback_result
-            
+
         except Exception as e:
             logger.error(f"混合推荐失败: {e}")
             return self._get_fallback_recommendations(top_n)
-    
+
+    def _get_triple_hybrid_recommendations(self, user_id, user_info, top_n):
+        """
+        三层混合推荐：CF + TF-IDF + 兴趣加权
+
+        核心思想：
+        1. 获取协同过滤推荐（CF）
+        2. 获取TF-IDF内容推荐（Content）
+        3. 获取兴趣主题推荐（Interest）
+        4. 对兴趣主题匹配的图书进行加权提升
+        5. 按动态比例混合三种推荐源
+
+        参数:
+            user_id: 用户ID
+            user_info: 用户信息（包含兴趣列表）
+            top_n: 推荐数量
+
+        返回:
+            list: 混合推荐结果
+        """
+        try:
+            # 1. 获取协同过滤推荐
+            cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
+            logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
+
+            # 2. 获取TF-IDF内容特征推荐
+            content_recommendations = self.content_cf.get_content_based_recommendations(user_id, top_n * 2)
+            logger.info(f"TF-IDF内容特征结果: {len(content_recommendations)} 个推荐")
+
+            # 3. 获取用户兴趣主题ID
+            user_interests = user_info.get('interests', [])
+            logger.info(f"用户兴趣主题: {user_interests}")
+
+            if not cf_recommendations and not content_recommendations:
+                logger.warning("协同过滤和TF-IDF都无结果，降级到兴趣推荐")
+                return self.content_cf._recommend_by_user_features(user_info, user_id, top_n)
+
+            # 4. 动态计算CF和Content的基础比例
+            dynamic_cf_ratio, dynamic_content_ratio, confidence_info = self._calculate_dynamic_cf_ratio(
+                similar_users, user_rating_count
+            )
+
+            logger.info(
+                f"[三层混合] 基础比例 - "
+                f"协同过滤={dynamic_cf_ratio:.1%}, "
+                f"内容特征={dynamic_content_ratio:.1%}, "
+                f"置信度={confidence_info.get('confidence_score', 'N/A')}"
+            )
+
+            # 5. 对推荐结果进行兴趣加权
+            cf_with_interest_boost = self._apply_interest_boost(cf_recommendations, user_interests)
+            content_with_interest_boost = self._apply_interest_boost(content_recommendations, user_interests)
+
+            # 6. 按动态比例混合
+            mixed_result = self._mix_recommendations(
+                cf_with_interest_boost,
+                content_with_interest_boost,
+                dynamic_cf_ratio,
+                top_n
+            )
+
+            # 7. 添加元数据
+            for rec in mixed_result:
+                rec['mixing_strategy'] = 'triple_hybrid_with_interest_boost'
+                rec['cf_ratio'] = round(dynamic_cf_ratio, 2)
+                rec['confidence_score'] = confidence_info.get('confidence_score')
+                rec['interest_boosted'] = rec.get('interest_boosted', False)
+
+            logger.info(f"三层混合推荐完成: {len(mixed_result)} 个推荐")
+            return mixed_result
+
+        except Exception as e:
+            logger.error(f"三层混合推荐失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return self._get_fallback_recommendations(top_n)
+
+    def _get_dual_hybrid_recommendations(self, user_id, top_n):
+        """
+        双层混合推荐：CF + TF-IDF（无兴趣加权）
+
+        适用场景：用户有评分历史和年龄，但没有选择兴趣
+
+        参数:
+            user_id: 用户ID
+            top_n: 推荐数量
+
+        返回:
+            list: 混合推荐结果
+        """
+        try:
+            # 1. 获取协同过滤推荐
+            cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
+            logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
+
+            # 2. 获取TF-IDF内容特征推荐
+            content_recommendations = self.content_cf.get_content_based_recommendations(user_id, top_n * 2)
+            logger.info(f"TF-IDF内容特征结果: {len(content_recommendations)} 个推荐")
+
+            if not cf_recommendations and not content_recommendations:
+                logger.warning("两种算法都无结果，使用降级推荐")
+                return self._get_fallback_recommendations(top_n)
+
+            # 3. 动态计算混合比例
+            dynamic_cf_ratio, dynamic_content_ratio, confidence_info = self._calculate_dynamic_cf_ratio(
+                similar_users, user_rating_count
+            )
+
+            logger.info(
+                f"[双层混合] "
+                f"协同过滤={dynamic_cf_ratio:.1%}, "
+                f"内容特征={dynamic_content_ratio:.1%} | "
+                f"置信度={confidence_info.get('confidence_score', 'N/A')}"
+            )
+
+            # 4. 混合推荐
+            if cf_recommendations and content_recommendations:
+                mixed_result = self._mix_recommendations(
+                    cf_recommendations,
+                    content_recommendations,
+                    dynamic_cf_ratio,
+                    top_n
+                )
+            elif cf_recommendations:
+                mixed_result = cf_recommendations[:top_n]
+            else:
+                mixed_result = content_recommendations[:top_n]
+
+            # 5. 添加元数据
+            for rec in mixed_result:
+                rec['mixing_strategy'] = 'dual_hybrid_cf_tfidf'
+                rec['cf_ratio'] = round(dynamic_cf_ratio, 2)
+                rec['confidence_score'] = confidence_info.get('confidence_score')
+
+            logger.info(f"双层混合推荐完成: {len(mixed_result)} 个推荐")
+            return mixed_result
+
+        except Exception as e:
+            logger.error(f"双层混合推荐失败: {e}")
+            return self._get_fallback_recommendations(top_n)
+
+    def _apply_interest_boost(self, recommendations, interest_theme_ids):
+        """
+        对符合用户兴趣主题的图书进行加权提升
+
+        加权策略：
+        - 如果图书的 theme_id 在用户兴趣列表中，提升其评分
+        - 提升方式：在排序时优先级提高
+
+        参数:
+            recommendations: 推荐列表
+            interest_theme_ids: 用户兴趣主题ID列表
+
+        返回:
+            list: 加权后的推荐列表（按新分数排序）
+        """
+        if not interest_theme_ids or not recommendations:
+            return recommendations
+
+        try:
+            # 需要查询每个推荐图书的 theme_id
+            boosted_recs = []
+
+            for rec in recommendations:
+                book_id = rec['bookId']
+
+                # 查询图书的 theme_id
+                book_info = self.content_cf.books_df[self.content_cf.books_df['book_id'] == book_id]
+
+                if not book_info.empty:
+                    theme_id = book_info.iloc[0].get('theme_id')
+
+                    # 如果图书主题在用户兴趣中，进行加权
+                    if pd.notna(theme_id) and int(theme_id) in interest_theme_ids:
+                        # 提升评分（根据原有评分类型）
+                        if 'similarity' in rec:
+                            rec['similarity'] = min(1.0, rec['similarity'] * 1.3)  # 提升30%
+                        if 'content_score' in rec:
+                            rec['content_score'] = min(1.0, rec['content_score'] * 1.3)
+                        if 'predicted_rating' in rec:
+                            rec['predicted_rating'] = min(5.0, rec['predicted_rating'] * 1.15)  # 提升15%
+
+                        rec['interest_boosted'] = True
+                        rec['matched_theme_id'] = int(theme_id)
+                        logger.debug(f"图书 {book_id} 匹配兴趣主题 {theme_id}，评分提升")
+                    else:
+                        rec['interest_boosted'] = False
+
+                boosted_recs.append(rec)
+
+            # 重新排序（根据提升后的评分）
+            if boosted_recs:
+                # 根据不同算法的评分字段排序
+                if 'similarity' in boosted_recs[0]:
+                    boosted_recs.sort(key=lambda x: x.get('similarity', 0), reverse=True)
+                elif 'content_score' in boosted_recs[0]:
+                    boosted_recs.sort(key=lambda x: x.get('content_score', 0), reverse=True)
+                elif 'predicted_rating' in boosted_recs[0]:
+                    boosted_recs.sort(key=lambda x: x.get('predicted_rating', 0), reverse=True)
+
+            interest_matched_count = sum(1 for r in boosted_recs if r.get('interest_boosted'))
+            logger.info(f"兴趣加权完成: {interest_matched_count}/{len(boosted_recs)} 本图书匹配用户兴趣")
+
+            return boosted_recs
+
+        except Exception as e:
+            logger.error(f"兴趣加权失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return recommendations
+
     def _get_cf_recommendations_no_fallback(self, user_id, top_n):
         """
         获取协同过滤推荐，不使用热门降级

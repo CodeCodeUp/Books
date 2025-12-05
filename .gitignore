@@ -50,6 +50,7 @@ cache/
 book-recommendation-frontend/node_modules/
 .claude/
 
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

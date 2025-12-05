@@ -198,15 +198,89 @@ class DataLoader:
             query = """
             SELECT r.book_id, r.rating, b.title, b.author
             FROM ratings r
-            JOIN books b ON r.book_id = b.book_id  
+            JOIN books b ON r.book_id = b.book_id
             WHERE r.user_id = %(user_id)s
             ORDER BY r.rating_date DESC
             """
-            
+
             user_ratings = pd.read_sql(query, self.engine, params={'user_id': user_id})
-            
+
             return user_ratings
-            
+
         except Exception as e:
             logger.error(f"获取用户已评分图书失败: {e}")
+            return pd.DataFrame()
+
+    def get_user_interests(self, user_id):
+        """
+        获取用户兴趣主题ID列表
+
+        参数:
+            user_id: 用户ID
+
+        返回:
+            list[int]: 用户选择的兴趣主题ID列表
+        """
+        try:
+            query = """
+            SELECT theme_id
+            FROM user_interests
+            WHERE user_id = %(user_id)s
+            """
+
+            result = pd.read_sql(query, self.engine, params={'user_id': user_id})
+
+            if result.empty:
+                return []
+
+            return result['theme_id'].tolist()
+
+        except Exception as e:
+            logger.error(f"获取用户兴趣失败: {e}")
+            return []
+
+    def get_books_by_themes(self, theme_ids, exclude_book_ids=None, limit=100):
+        """
+        根据主题ID列表获取相关图书
+
+        参数:
+            theme_ids: 主题ID列表
+            exclude_book_ids: 需要排除的图书ID集合
+            limit: 返回数量限制
+
+        返回:
+            DataFrame: 符合主题的图书列表
+        """
+        if not theme_ids:
+            return pd.DataFrame()
+
+        try:
+            # 构建 IN 子句的占位符
+            placeholders = ', '.join(['%s'] * len(theme_ids))
+
+            query = f"""
+            SELECT book_id, title, author, publisher, year,
+                   avg_rating, rating_count, theme_id,
+                   image_url_s, image_url_m, image_url_l
+            FROM books
+            WHERE theme_id IN ({placeholders})
+              AND rating_count >= 5
+              AND avg_rating >= 3.0
+            ORDER BY avg_rating DESC, rating_count DESC
+            LIMIT {limit * 2}
+            """
+
+            # params 必须是元组格式
+            result = pd.read_sql(query, self.engine, params=tuple(theme_ids))
+
+            # 排除指定图书
+            if exclude_book_ids and not result.empty:
+                result = result[~result['book_id'].isin(exclude_book_ids)]
+
+            return result.head(limit)
+
+        except Exception as e:
+            logger.error(f"根据主题获取图书失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return pd.DataFrame()
