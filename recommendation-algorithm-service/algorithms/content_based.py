@@ -243,36 +243,126 @@ class ContentBasedRecommendation:
             return None
     
     def get_similar_books_by_content(self, target_book_id, top_k=10):
-        """基于内容特征的相似图书推荐（性能优化版本）"""
-        logger.info(f"基于内容特征查找与图书 {target_book_id} 相似的图书...")
-        
+        """
+        基于TF-IDF向量的相似图书推荐（与个人推荐页面技术统一）
+
+        原理：
+        1. 提取目标图书的TF-IDF向量
+        2. 预筛选候选图书（性能优化）
+        3. 批量计算TF-IDF余弦相似度
+        4. 返回相似度最高的Top-K图书
+
+        参数:
+            target_book_id: 目标图书ID
+            top_k: 返回数量
+
+        返回:
+            list: 相似图书列表
+        """
+        logger.info(f"[TF-IDF方法] 查找与图书 {target_book_id} 相似的图书...")
+
+        try:
+            # 0. 确保TF-IDF特征矩阵已提取
+            if self.book_features is None:
+                logger.warning("TF-IDF特征矩阵未提取，开始提取...")
+                if not self.extract_book_features():
+                    logger.error("TF-IDF特征提取失败，降级到属性匹配方法")
+                    return self._get_similar_books_by_content_fallback(target_book_id, top_k)
+
+            # 1. 获取目标图书信息和索引
+            target_book = self.books_df[self.books_df['book_id'] == target_book_id]
+            if target_book.empty:
+                logger.warning(f"图书 {target_book_id} 不存在")
+                return []
+
+            target_book_idx = target_book.index[0]
+            target_book_data = target_book.iloc[0]
+            logger.info(f"目标图书: {target_book_data['title']} - {target_book_data['author']}")
+
+            # 2. 提取目标图书的TF-IDF向量
+            target_vector = self.book_features[target_book_idx]
+
+            # 3. 预筛选候选图书（避免与14万本图书全量比较）
+            candidate_books = self._get_content_candidates(target_book_data)
+            logger.info(f"预筛选候选图书: {len(candidate_books)} 本（从{len(self.books_df):,}本筛选）")
+
+            if len(candidate_books) == 0:
+                logger.warning("没有找到合适的候选图书")
+                return []
+
+            # 4. 获取候选图书的索引
+            candidate_indices = candidate_books.index.tolist()
+
+            # 5. 批量计算TF-IDF余弦相似度（矩阵运算，高效）
+            candidate_features = self.book_features[candidate_indices]
+            similarities = cosine_similarity(target_vector, candidate_features)[0]
+
+            # 6. 排序获取Top-K
+            top_indices = np.argsort(similarities)[::-1][:top_k]
+            top_similarities = similarities[top_indices]
+
+            # 7. 构建推荐结果
+            recommendations = []
+            for idx, similarity in zip(top_indices, top_similarities):
+                book = candidate_books.iloc[idx]
+                recommendations.append({
+                    'bookId': book['book_id'],
+                    'title': book['title'],
+                    'author': book['author'] or '未知作者',
+                    'publisher': book.get('publisher', '') or '',
+                    'year': int(book['year']) if pd.notna(book['year']) else None,
+                    'imageUrlS': book.get('image_url_s', ''),
+                    'imageUrlM': book.get('image_url_m', ''),
+                    'imageUrlL': book.get('image_url_l', ''),
+                    'avgRating': round(float(book['avg_rating']), 2),
+                    'ratingCount': int(book['rating_count']),
+                    'similarity': round(float(similarity), 3),
+                    'content_score': round(float(similarity), 3),
+                    'algorithm': 'content_based_tfidf',
+                    'reason': f'TF-IDF内容相似度{similarity:.2f}'
+                })
+
+            logger.info(f"[TF-IDF方法] 找到 {len(recommendations)} 本相似图书（平均相似度: {np.mean(top_similarities):.3f}）")
+            return recommendations
+
+        except Exception as e:
+            logger.error(f"TF-IDF相似图书推荐失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # 降级到属性匹配方法
+            return self._get_similar_books_by_content_fallback(target_book_id, top_k)
+
+    def _get_similar_books_by_content_fallback(self, target_book_id, top_k=10):
+        """
+        降级方案：基于简单属性匹配的相似图书推荐
+        （当TF-IDF特征矩阵不可用时使用）
+        """
+        logger.warning("使用降级方案：简单属性匹配")
+
         try:
             # 获取目标图书信息
             target_book = self.books_df[self.books_df['book_id'] == target_book_id]
             if target_book.empty:
                 return []
-            
+
             target_book_data = target_book.iloc[0]
-            logger.info(f"目标图书: {target_book_data['title']} - {target_book_data['author']}")
-            
-            # 1. 预筛选候选图书（避免与14万本图书比较）
+
+            # 预筛选候选图书
             candidate_books = self._get_content_candidates(target_book_data)
-            logger.info(f"预筛选候选图书: {len(candidate_books)} 本（从14万本筛选）")
-            
+
             if len(candidate_books) == 0:
-                logger.warning("没有找到合适的候选图书")
                 return []
-            
-            # 2. 只对候选图书计算详细相似度
+
+            # 计算属性相似度
             similarities = []
-            
+
             for _, book in candidate_books.iterrows():
                 if book['book_id'] == target_book_id:
                     continue
-                
-                # 计算内容相似度
+
+                # 使用属性匹配计算相似度
                 similarity = self._calculate_book_content_similarity(target_book_data, book)
-                
+
                 if similarity > 0.2:  # 相似度阈值
                     similarities.append({
                         'bookId': book['book_id'],
@@ -286,34 +376,46 @@ class ContentBasedRecommendation:
                         'avgRating': round(float(book['avg_rating']), 2),
                         'ratingCount': int(book['rating_count']),
                         'similarity': round(similarity, 3),
-                        'reason': f'内容特征相似度{similarity:.2f}'
+                        'content_score': round(similarity, 3),
+                        'algorithm': 'content_based_attributes',
+                        'reason': f'属性相似度{similarity:.2f}'
                     })
-            
+
             # 按相似度排序
             similarities.sort(key=lambda x: x['similarity'], reverse=True)
-            
-            logger.info(f"基于内容特征找到 {len(similarities[:top_k])} 本相似图书")
+
+            logger.info(f"[属性匹配] 找到 {len(similarities[:top_k])} 本相似图书")
             return similarities[:top_k]
-            
+
         except Exception as e:
-            logger.error(f"内容特征相似图书推荐失败: {e}")
+            logger.error(f"属性匹配相似图书推荐失败: {e}")
             return []
     
     def _get_content_candidates(self, target_book):
         """预筛选候选图书（性能优化关键）"""
         try:
             candidate_books = pd.DataFrame()
-            
-            # 1. 同作者图书（最高优先级）
+
+            # 1. 同主题图书（新增：最高优先级）
+            if pd.notna(target_book.get('theme_id')):
+                same_theme = self.books_df[
+                    (self.books_df['theme_id'] == target_book['theme_id']) &
+                    (self.books_df['book_id'] != target_book['book_id'])
+                ]
+                candidate_books = pd.concat([candidate_books, same_theme], ignore_index=True)
+                logger.info(f"找到同主题图书: {len(same_theme)} 本")
+
+            # 2. 同作者图书
             if pd.notna(target_book['author']):
                 same_author = self.books_df[
                     (self.books_df['author'] == target_book['author']) &
-                    (self.books_df['book_id'] != target_book['book_id'])
+                    (self.books_df['book_id'] != target_book['book_id']) &
+                    (~self.books_df['book_id'].isin(candidate_books['book_id']))  # 去重
                 ]
                 candidate_books = pd.concat([candidate_books, same_author], ignore_index=True)
                 logger.info(f"找到同作者图书: {len(same_author)} 本")
-            
-            # 2. 同出版社图书
+
+            # 3. 同出版社图书
             if pd.notna(target_book['publisher']):
                 same_publisher = self.books_df[
                     (self.books_df['publisher'] == target_book['publisher']) &
@@ -322,8 +424,8 @@ class ContentBasedRecommendation:
                 ]
                 candidate_books = pd.concat([candidate_books, same_publisher], ignore_index=True)
                 logger.info(f"找到同出版社图书: {len(same_publisher)} 本")
-            
-            # 3. 相近年代图书（±10年）
+
+            # 4. 相近年代图书（±10年）
             if pd.notna(target_book['year']):
                 target_year = int(target_book['year'])
                 nearby_years = self.books_df[
@@ -336,8 +438,8 @@ class ContentBasedRecommendation:
                 nearby_years_sample = nearby_years.nlargest(500, ['avg_rating', 'rating_count'])
                 candidate_books = pd.concat([candidate_books, nearby_years_sample], ignore_index=True)
                 logger.info(f"找到相近年代图书: {len(nearby_years_sample)} 本")
-            
-            # 4. 高质量图书补充（如果候选不够）
+
+            # 5. 高质量图书补充（如果候选不够）
             if len(candidate_books) < 100:
                 quality_books = self.books_df[
                     (self.books_df['avg_rating'] >= 4.0) &
@@ -347,44 +449,58 @@ class ContentBasedRecommendation:
                 ].head(200)  # 限制数量
                 candidate_books = pd.concat([candidate_books, quality_books], ignore_index=True)
                 logger.info(f"补充高质量图书: {len(quality_books)} 本")
-            
+
             # 去重并限制最终候选数量
             candidate_books = candidate_books.drop_duplicates(subset=['book_id']).head(1000)
-            
+
             logger.info(f"最终候选图书数量: {len(candidate_books)} 本")
             return candidate_books
-            
+
         except Exception as e:
             logger.error(f"预筛选候选图书失败: {e}")
             return pd.DataFrame()
     
     def _calculate_book_content_similarity(self, book1, book2):
-        """计算两本图书的内容相似度"""
+        """
+        计算两本图书的内容相似度（增强版：包含主题匹配）
+
+        权重分配（总计1.0）：
+        - 作者相似度: 0.30 (30%)
+        - 主题相似度: 0.25 (25%) ← 新增
+        - 出版社相似度: 0.25 (25%)
+        - 年份相似度: 0.15 (15%)
+        - 评分相似度: 0.05 (5%)
+        """
         try:
             similarity = 0.0
-            
-            # 1. 作者相似度 (权重50%)
+
+            # 1. 作者相似度 (权重30%)
             if book1['author'] == book2['author'] and pd.notna(book1['author']):
-                similarity += 0.4
-            
-            # 2. 出版社相似度 (权重20%)
+                similarity += 0.30
+
+            # 2. 主题相似度 (权重25%) ← 新增
+            if pd.notna(book1.get('theme_id')) and pd.notna(book2.get('theme_id')):
+                if book1['theme_id'] == book2['theme_id']:
+                    similarity += 0.25
+
+            # 3. 出版社相似度 (权重25%)
             if book1['publisher'] == book2['publisher'] and pd.notna(book1['publisher']):
-                similarity += 0.3
-            
-            # 3. 年份相似度 (权重20%)
+                similarity += 0.25
+
+            # 4. 年份相似度 (权重15%)
             if pd.notna(book1['year']) and pd.notna(book2['year']):
                 year_diff = abs(int(book1['year']) - int(book2['year']))
                 year_similarity = max(0, 1 - year_diff / 20)  # 20年内认为相似
-                similarity += 0.2 * year_similarity
-            
-            # 4. 评分相似度 (权重10%)
+                similarity += 0.15 * year_similarity
+
+            # 5. 评分相似度 (权重5%)
             if pd.notna(book1['avg_rating']) and pd.notna(book2['avg_rating']):
                 rating_diff = abs(float(book1['avg_rating']) - float(book2['avg_rating']))
                 rating_similarity = max(0, 1 - rating_diff / 2)  # 2分内认为相似
-                similarity += 0.1 * rating_similarity
-            
+                similarity += 0.05 * rating_similarity
+
             return similarity
-            
+
         except Exception as e:
             logger.error(f"计算图书内容相似度失败: {e}")
             return 0.0
@@ -752,19 +868,22 @@ class ContentBasedRecommendation:
     def get_algorithm_info(self):
         """获取算法信息"""
         return {
-            'name': '基于内容特征的推荐',
+            'name': '基于TF-IDF内容特征的推荐',
             'type': 'content_based_filtering',
-            'description': '基于图书内容特征的相似性推荐，解决冷启动问题',
+            'description': '基于TF-IDF文本向量和图书内容特征的相似性推荐，解决冷启动问题',
             'features': [
-                '作者特征匹配',
-                '标题关键词相似度',
-                '出版社特征',
-                '年代特征',
-                '评分质量特征'
+                'TF-IDF文本特征（1500维）',
+                '标题+作者+出版社组合向量',
+                '年份标准化特征',
+                '评分质量特征',
+                '主题分类匹配',
+                '属性匹配降级方案'
             ],
             'advantages': [
+                '语义相似性捕捉（TF-IDF）',
                 '无冷启动问题',
                 '推荐解释性强',
-                '不依赖用户行为'
+                '不依赖用户行为',
+                '降级机制保证鲁棒性'
             ]
         }
