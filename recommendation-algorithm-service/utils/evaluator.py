@@ -91,23 +91,20 @@ class RecommendationEvaluator:
         
         return train_df, test_df, active_users
 
-    rate = 100
-    def evaluate_algorithm(self, algorithm_name, algorithm, train_df, test_df, test_users, 
+    def evaluate_algorithm(self, algorithm_name, algorithm, train_df, test_df, test_users,
                           top_k=10, rating_threshold=4.0):
         """评估单个推荐算法"""
         logger.info(f"=== 评估算法: {algorithm_name} ===")
-        
+
         precision_scores = []
         recall_scores = []
         f1_scores = []
         coverage_books = set()
-        
+
         # 为每个测试用户生成推荐并评估
         evaluated_users = 0
-        
+
         for user_id in test_users:
-            base = 50
-            rate = 100
             try:
                 # 获取用户的测试集（真实喜欢的书）
                 user_test_ratings = test_df[test_df['user_id'] == user_id]
@@ -201,19 +198,14 @@ class RecommendationEvaluator:
                 continue
 
 
-        # 计算平均指标
+        # 计算平均指标（统一使用100的缩放因子）
         total_books = len(self.data_loader.get_books_data())
-        
-        if algorithm_name == "内容特征推荐":
-            avg_precision = np.mean(precision_scores) * base if precision_scores else 0
-            avg_recall = np.mean(recall_scores) * base if recall_scores else 0
-            avg_f1 = np.mean(f1_scores) * base if f1_scores else 0
-            coverage = len(coverage_books) / total_books * base if total_books > 0 else 0
-        else:
-            avg_precision = np.mean(precision_scores) * rate if precision_scores else 0
-            avg_recall = np.mean(recall_scores) * rate if recall_scores else 0
-            avg_f1 = np.mean(f1_scores) * rate if f1_scores else 0
-            coverage = len(coverage_books) / total_books * rate if total_books > 0 else 0
+        rate = 100
+
+        avg_precision = np.mean(precision_scores) * rate if precision_scores else 0
+        avg_recall = np.mean(recall_scores) * rate if recall_scores else 0
+        avg_f1 = np.mean(f1_scores) * rate if f1_scores else 0
+        coverage = len(coverage_books) / total_books * rate if total_books > 0 else 0
         
         result = {
             'algorithm': algorithm_name,
