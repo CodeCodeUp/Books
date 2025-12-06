@@ -395,6 +395,8 @@ class ContentBasedRecommendation:
         """预筛选候选图书（性能优化关键）"""
         try:
             candidate_books = pd.DataFrame()
+            # 使用集合追踪已添加的book_id，避免访问空DataFrame的列
+            added_book_ids = set()
 
             # 1. 同主题图书（新增：最高优先级）
             if pd.notna(target_book.get('theme_id')):
@@ -403,6 +405,7 @@ class ContentBasedRecommendation:
                     (self.books_df['book_id'] != target_book['book_id'])
                 ]
                 candidate_books = pd.concat([candidate_books, same_theme], ignore_index=True)
+                added_book_ids.update(same_theme['book_id'].values)
                 logger.info(f"找到同主题图书: {len(same_theme)} 本")
 
             # 2. 同作者图书
@@ -410,9 +413,10 @@ class ContentBasedRecommendation:
                 same_author = self.books_df[
                     (self.books_df['author'] == target_book['author']) &
                     (self.books_df['book_id'] != target_book['book_id']) &
-                    (~self.books_df['book_id'].isin(candidate_books['book_id']))  # 去重
+                    (~self.books_df['book_id'].isin(added_book_ids))  # 去重
                 ]
                 candidate_books = pd.concat([candidate_books, same_author], ignore_index=True)
+                added_book_ids.update(same_author['book_id'].values)
                 logger.info(f"找到同作者图书: {len(same_author)} 本")
 
             # 3. 同出版社图书
@@ -420,9 +424,10 @@ class ContentBasedRecommendation:
                 same_publisher = self.books_df[
                     (self.books_df['publisher'] == target_book['publisher']) &
                     (self.books_df['book_id'] != target_book['book_id']) &
-                    (~self.books_df['book_id'].isin(candidate_books['book_id']))  # 去重
+                    (~self.books_df['book_id'].isin(added_book_ids))  # 去重
                 ]
                 candidate_books = pd.concat([candidate_books, same_publisher], ignore_index=True)
+                added_book_ids.update(same_publisher['book_id'].values)
                 logger.info(f"找到同出版社图书: {len(same_publisher)} 本")
 
             # 4. 相近年代图书（±10年）
@@ -432,11 +437,12 @@ class ContentBasedRecommendation:
                     (self.books_df['year'] >= target_year - 10) &
                     (self.books_df['year'] <= target_year + 10) &
                     (self.books_df['book_id'] != target_book['book_id']) &
-                    (~self.books_df['book_id'].isin(candidate_books['book_id']))  # 去重
+                    (~self.books_df['book_id'].isin(added_book_ids))  # 去重
                 ]
                 # 限制相近年代的数量，避免过多
                 nearby_years_sample = nearby_years.nlargest(500, ['avg_rating', 'rating_count'])
                 candidate_books = pd.concat([candidate_books, nearby_years_sample], ignore_index=True)
+                added_book_ids.update(nearby_years_sample['book_id'].values)
                 logger.info(f"找到相近年代图书: {len(nearby_years_sample)} 本")
 
             # 5. 高质量图书补充（如果候选不够）
@@ -445,7 +451,7 @@ class ContentBasedRecommendation:
                     (self.books_df['avg_rating'] >= 4.0) &
                     (self.books_df['rating_count'] >= 20) &
                     (self.books_df['book_id'] != target_book['book_id']) &
-                    (~self.books_df['book_id'].isin(candidate_books['book_id']))  # 去重
+                    (~self.books_df['book_id'].isin(added_book_ids))  # 去重
                 ].head(200)  # 限制数量
                 candidate_books = pd.concat([candidate_books, quality_books], ignore_index=True)
                 logger.info(f"补充高质量图书: {len(quality_books)} 本")
@@ -458,6 +464,8 @@ class ContentBasedRecommendation:
 
         except Exception as e:
             logger.error(f"预筛选候选图书失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return pd.DataFrame()
     
     def _calculate_book_content_similarity(self, book1, book2):
