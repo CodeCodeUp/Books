@@ -487,41 +487,235 @@ class HybridRecommendation:
         """统一的降级推荐：前10本评分最高且人数最多的图书"""
         logger.info("使用统一降级策略：返回评分最高且评价人数最多的优质图书")
         return self.content_cf._get_top_quality_books(top_n)
-    
-    def get_hybrid_similar_books(self, target_book_id, top_k=6, cf_ratio=0.7):
-        """混合相似图书：物品协同过滤 + 内容特征 (图书详情页使用)"""
-        logger.info(f"为图书 {target_book_id} 生成混合相似推荐 (物品协同{cf_ratio:.0%} + 内容特征{1-cf_ratio:.0%})")
-        
+
+    def _calculate_dynamic_item_ratio(self, target_book_id, cf_similar_books, content_similar_books):
+        """
+        基于目标图书的数据质量动态计算混合比例（图书详情页专用）
+
+        核心思想：
+        - 评分数量越多 → 协同过滤越可靠 → CF权重提升
+        - 相似图书质量越高 → CF效果越好 → CF权重提升
+        - 冷门图书数据稀疏 → 内容特征更安全 → Content权重提升
+
+        公式：
+            quantity_score = min(rating_count / 500, 1.0)
+            cf_quality_score = min(cf_count / 20, 1.0) × cf_avg_similarity
+            confidence = quantity_score × cf_quality_score
+            cf_ratio = 0.40 + 0.45 × confidence  # 范围 [0.40, 0.85]
+
+        参数:
+            target_book_id: 目标图书ID
+            cf_similar_books: 物品协同过滤找到的相似图书列表
+            content_similar_books: 内容特征找到的相似图书列表
+
+        返回:
+            tuple: (cf_ratio, content_ratio, confidence_info)
+                - cf_ratio: 协同过滤占比 [0.40, 0.85]
+                - content_ratio: 内容特征占比 [0.15, 0.60]
+                - confidence_info: 置信度详细信息
+        """
         try:
-            # 1. 尝试物品协同过滤
-            cf_similar = self.item_cf.get_similar_books_for_item(target_book_id, top_k * 2)
-            
-            # 2. 尝试内容特征相似
-            content_similar = self.content_cf.get_similar_books_by_content(target_book_id, top_k * 2)
-            
-            # 3. 混合策略
-            if cf_similar and content_similar:
-                logger.info("物品协同过滤和内容特征都有结果，按7:3混合")
-                mixed_similar = self._mix_recommendations(
-                    cf_similar, content_similar, cf_ratio, top_k
-                )
-            elif cf_similar:
-                logger.info("只有物品协同过滤有结果，使用协同过滤")
-                mixed_similar = cf_similar[:top_k]
-            elif content_similar:
-                logger.info("只有内容特征有结果，使用内容特征")
-                mixed_similar = content_similar[:top_k]
+            # 1. 获取目标图书的基本信息
+            target_book_info = self.content_cf.books_df[
+                self.content_cf.books_df['book_id'] == target_book_id
+            ]
+
+            if target_book_info.empty:
+                logger.warning(f"图书 {target_book_id} 不存在于数据库中，使用默认比例 50:50")
+                return 0.50, 0.50, {
+                    'strategy': 'book_not_found',
+                    'reason': '目标图书不存在'
+                }
+
+            # 2. 提取图书数据质量指标
+            target_book_data = target_book_info.iloc[0]
+            rating_count = int(target_book_data['rating_count'])
+            avg_rating = float(target_book_data['avg_rating'])
+
+            # 3. 评分数量归一化得分 [0, 1]
+            # 设定500个评分为满分（基于Book-Crossing数据集的中位数分析）
+            # 超过500个评分的图书，协同过滤已经非常可靠
+            quantity_score = min(rating_count / 100.0, 1.0)
+
+            # 4. 协同过滤结果质量评估
+            if cf_similar_books and len(cf_similar_books) > 0:
+                # 4.1 相似图书数量得分 [0, 1]
+                # 20本相似书为满分（一般找到20本以上说明数据很充足）
+                cf_count = len(cf_similar_books)
+                cf_count_score = min(cf_count / 20.0, 1.0)
+
+                # 4.2 计算平均相似度 [0, 1]
+                cf_similarities = [book.get('similarity', 0) for book in cf_similar_books]
+                cf_avg_similarity = np.mean(cf_similarities) if cf_similarities else 0.0
+
+                # 4.3 协同过滤质量得分 = 数量得分 × 相似度质量
+                # 这个公式体现了"数量"和"质量"的双重考量
+                cf_quality_score = cf_count_score * cf_avg_similarity
             else:
-                logger.warning("两种算法都无结果，返回同作者图书")
-                mixed_similar = self._get_same_author_books(target_book_id, top_k)
-            
-            logger.info(f"混合相似图书推荐完成，返回 {len(mixed_similar)} 个推荐")
-            return mixed_similar
-            
+                # 没有协同过滤结果，质量得分为0
+                cf_count = 0
+                cf_avg_similarity = 0.0
+                cf_quality_score = 0.0
+
+            # 5. 综合置信度分数 = 图书数据质量 × CF算法质量
+            # 只有当图书本身评分多 AND 找到了高质量相似图书时，置信度才会高
+            confidence_score = quantity_score * cf_quality_score
+
+            # 6. 映射到协同过滤比例
+            # 基准线：40% (极冷门书，内容特征占主导 60%)
+            # 最大值：85% (超热门书，协同过滤高度可靠)
+            # 设计理念：即使是冷门书，也给协同过滤保留40%的机会
+            #          即使是热门书，也给内容特征保留15%的多样性
+            MIN_CF_RATIO = 0.40
+            MAX_CF_RATIO = 0.85
+            cf_ratio = MIN_CF_RATIO + (MAX_CF_RATIO - MIN_CF_RATIO) * confidence_score
+            content_ratio = 1.0 - cf_ratio
+
+            # 7. 构建详细置信度信息（用于日志输出和调试分析）
+            confidence_info = {
+                'rating_count': rating_count,
+                'avg_rating': round(avg_rating, 2),
+                'quantity_score': round(quantity_score, 4),
+                'cf_similar_count': cf_count,
+                'cf_avg_similarity': round(cf_avg_similarity, 4),
+                'cf_count_score': round(cf_count_score, 4) if cf_count > 0 else 0.0,
+                'cf_quality_score': round(cf_quality_score, 4),
+                'confidence_score': round(confidence_score, 4),
+                'strategy': 'item_quality_adaptive',
+                'formula': f'cf_ratio = {MIN_CF_RATIO} + {MAX_CF_RATIO - MIN_CF_RATIO} × confidence'
+            }
+
+            # 8. 输出详细日志
+            logger.info(
+                f"[图书详情动态比例] 图书ID={target_book_id}: "
+                f"评分数={rating_count}, "
+                f"数量得分={quantity_score:.2f}, "
+                f"CF相似书={cf_count}本, "
+                f"CF平均相似度={cf_avg_similarity:.2f}, "
+                f"CF质量得分={cf_quality_score:.2f}, "
+                f"综合置信度={confidence_score:.3f} → "
+                f"协同过滤={cf_ratio:.1%}, 内容特征={content_ratio:.1%}"
+            )
+
+            return cf_ratio, content_ratio, confidence_info
+
         except Exception as e:
-            logger.error(f"混合相似图书推荐失败: {e}")
+            logger.error(f"动态比例计算失败，回退到默认比例 70:30: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return 0.70, 0.30, {
+                'strategy': 'fallback_fixed_ratio',
+                'error': str(e),
+                'reason': '计算异常，使用固定比例'
+            }
+
+    def get_hybrid_similar_books(self, target_book_id, top_k=6):
+        """
+        动态混合相似图书推荐（图书详情页专用）
+
+        策略：根据目标图书的数据质量动态调整协同过滤和内容特征的混合比例
+        - 热门书（评分多、相似书多）：协同过滤权重高 (70%-85%)
+        - 冷门书（评分少、相似书少）：内容特征权重高 (55%-60%)
+
+        参数:
+            target_book_id: 目标图书ID
+            top_k: 返回推荐数量（默认6本）
+
+        返回:
+            list: 推荐图书列表，每个推荐包含动态比例元数据
+        """
+        logger.info(f"为图书 {target_book_id} 生成动态混合相似推荐...")
+
+        try:
+            # 1. 获取物品协同过滤推荐
+            cf_similar = self.item_cf.get_similar_books_for_item(target_book_id, top_k * 2)
+            logger.info(f"物品协同过滤找到 {len(cf_similar) if cf_similar else 0} 本相似图书")
+
+            # 2. 获取内容特征推荐
+            content_similar = self.content_cf.get_similar_books_by_content(target_book_id, top_k * 2)
+            logger.info(f"内容特征找到 {len(content_similar) if content_similar else 0} 本相似图书")
+
+            # 3. 根据结果选择推荐策略
+            if cf_similar and content_similar:
+                # 【情况1】两种算法都有结果 → 动态混合推荐（核心改进）
+                logger.info("[情况1] 物品协同 + 内容特征都有结果，使用动态混合策略")
+
+                # 3.1 动态计算混合比例
+                dynamic_cf_ratio, dynamic_content_ratio, confidence_info = \
+                    self._calculate_dynamic_item_ratio(target_book_id, cf_similar, content_similar)
+
+                # 3.2 按动态比例混合推荐
+                mixed_similar = self._mix_recommendations(
+                    cf_similar, content_similar, dynamic_cf_ratio, top_k
+                )
+
+                # 3.3 为每个推荐添加元数据
+                for rec in mixed_similar:
+                    rec['mixing_strategy'] = 'dynamic_item_cf_content'
+                    rec['cf_ratio'] = round(dynamic_cf_ratio, 2)
+                    rec['content_ratio'] = round(dynamic_content_ratio, 2)
+                    rec['confidence_info'] = confidence_info
+                    rec['algorithm'] = 'item_quality_adaptive'
+
+                logger.info(
+                    f"动态混合推荐完成: CF {dynamic_cf_ratio:.1%} + Content {dynamic_content_ratio:.1%}, "
+                    f"返回 {len(mixed_similar)} 个推荐"
+                )
+                return mixed_similar
+
+            elif cf_similar:
+                # 【情况2】仅物品协同有结果 → 纯协同过滤
+                logger.info("[情况2] 仅物品协同过滤有结果，使用纯协同过滤推荐")
+                result = cf_similar[:top_k]
+
+                # 添加元数据
+                for rec in result:
+                    rec['mixing_strategy'] = 'item_cf_only'
+                    rec['cf_ratio'] = 1.0
+                    rec['content_ratio'] = 0.0
+                    rec['algorithm'] = 'item_based_cf_only'
+                    rec['reason'] = '基于评分模式的协同过滤推荐'
+
+                logger.info(f"纯协同过滤推荐完成，返回 {len(result)} 个推荐")
+                return result
+
+            elif content_similar:
+                # 【情况3】仅内容特征有结果 → 纯内容推荐
+                logger.info("[情况3] 仅内容特征有结果，使用纯内容特征推荐")
+                result = content_similar[:top_k]
+
+                # 添加元数据
+                for rec in result:
+                    rec['mixing_strategy'] = 'content_only'
+                    rec['cf_ratio'] = 0.0
+                    rec['content_ratio'] = 1.0
+                    rec['algorithm'] = 'content_based_only'
+                    rec['reason'] = '基于标题作者出版社的内容特征推荐'
+
+                logger.info(f"纯内容特征推荐完成，返回 {len(result)} 个推荐")
+                return result
+
+            else:
+                # 【情况4】两种算法都无结果 → 降级到同作者推荐
+                logger.warning("[情况4] 物品协同和内容特征都无结果，降级到同作者图书推荐")
+                result = self._get_same_author_books(target_book_id, top_k)
+
+                # 添加元数据
+                for rec in result:
+                    rec['mixing_strategy'] = 'same_author_fallback'
+                    rec['cf_ratio'] = 0.0
+                    rec['content_ratio'] = 0.0
+                    # algorithm 已在 _get_same_author_books 中设置
+
+                logger.info(f"同作者推荐完成，返回 {len(result)} 个推荐")
+                return result
+
+        except Exception as e:
+            logger.error(f"图书详情页推荐失败: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
-    
+
     def _mix_recommendations(self, primary_recs, secondary_recs, primary_ratio, total_count):
         """按比例混合两个推荐结果"""
         try:
@@ -547,10 +741,6 @@ class HybridRecommendation:
         except Exception as e:
             logger.error(f"混合推荐失败: {e}")
             return primary_recs[:total_count]
-    
-    def _get_popular_fallback(self, top_n):
-        """热门图书后备推荐（使用内容特征的优质图书）"""
-        return self.content_cf._get_top_quality_books(top_n)
     
     def _get_same_author_books(self, target_book_id, top_k):
         """同作者图书推荐（最后的降级策略）"""

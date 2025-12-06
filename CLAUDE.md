@@ -16,46 +16,138 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Backend (SpringBoot)
 ```bash
 cd book-recommendation-backend
-mvn spring-boot:run                    # 启动后端服务 (端口8080)
-mvn clean package -DskipTests          # 打包
-mvn test                               # 运行测试
+
+# 开发模式启动
+mvn spring-boot:run
+
+# 清理并打包（跳过测试）
+mvn clean package -DskipTests
+
+# 运行所有测试
+mvn test
+
+# 运行单个测试类
+mvn test -Dtest=UserServiceTest
+
+# 生产模式运行打包后的 JAR
+java -jar target/book-recommendation-1.0.0.jar
 ```
+
+**注意**: 后端默认运行在 `http://localhost:8080/api`
 
 ### Frontend (Vue3)
 ```bash
 cd book-recommendation-frontend
-npm install                            # 安装依赖
-npm run dev                            # 启动开发服务器 (端口3000)
-npm run build                          # 生产构建
+
+# 首次运行需安装依赖
+npm install
+
+# 开发模式启动（支持热重载）
+npm run dev
+
+# 生产构建
+npm run build
+
+# 预览生产构建
+npm run preview
 ```
+
+**注意**: 前端默认运行在 `http://localhost:3000`
 
 ### Algorithm Service (Python Flask)
 ```bash
 cd recommendation-algorithm-service
-pip install -r requirements.txt        # 安装依赖
-python app.py                          # 启动算法服务 (端口5000)
-python run_evaluation.py               # 运行算法评估
+
+# 首次运行需安装依赖
+pip install -r requirements.txt
+
+# 启动算法服务
+python app.py
+
+# 运行算法评估（评估推荐质量）
+python run_evaluation.py
 ```
+
+**注意**:
+- 算法服务默认运行在 `http://localhost:5000`
+- 需要确保 MySQL 数据库可访问
+- 首次启动会预加载数据并构建 TF-IDF 特征矩阵（约 1-2 分钟）
 
 ### Docker Deployment
 ```bash
-docker-compose up -d                   # 一键启动所有服务
-docker-compose down                    # 停止所有服务
-docker-compose logs -f                 # 查看日志
+# 一键启动所有服务（后台运行）
+docker-compose up -d
+
+# 启动并查看日志
+docker-compose up
+
+# 停止所有服务
+docker-compose down
+
+# 查看服务日志
+docker-compose logs -f
+
+# 查看特定服务日志
+docker-compose logs -f algorithm-service
+docker-compose logs -f backend
+docker-compose logs -f frontend
+
+# 重启特定服务
+docker-compose restart algorithm-service
 ```
 
-### Quick Start Scripts
+## Configuration
+
+### Database Configuration
+
+**开发环境** (application.yml):
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://116.205.244.106:33066/book_recommendation
+    username: root
+    password: 202358
+```
+
+**Docker 环境** (docker-compose.yml):
+```yaml
+environment:
+  DB_HOST: 116.205.244.106
+  DB_PORT: 3306
+  DB_NAME: book_recommendation
+```
+
+**注意**: 开发环境数据库端口为 `33066`，Docker 环境为 `3306`
+
+### Environment Variables
+
+后端服务 (application.yml):
+```yaml
+jwt:
+  secret: bookRecommendationSystemSecretKey2025
+  expiration: 25920000000  # 300天（毫秒）
+
+recommendation:
+  service:
+    url: http://localhost:5000  # 算法服务地址
+```
+
+算法服务需要的环境变量:
 ```bash
-# Windows
-start-backend.bat                      # 启动后端
-start-frontend.bat                     # 启动前端
-start-algorithm.bat                    # 启动算法服务
-
-# Linux/Mac
-./start-backend.sh
-./start-frontend.sh
-./start-algorithm.sh
+DB_HOST=116.205.244.106
+DB_PORT=33066  # 开发环境
+DB_USER=root
+DB_PASSWORD=202358
+DB_NAME=book_recommendation
 ```
+
+### CORS Configuration
+
+后端默认允许的跨域来源:
+- `http://localhost:3000` (Vue 开发服务器)
+- `http://localhost:5173` (Vite 备用端口)
+
+如需修改，编辑 `book-recommendation-backend/src/main/java/com/bookrs/recommendation/config/WebConfig.java`
 
 ## Architecture
 
@@ -117,6 +209,15 @@ start-algorithm.bat                    # 启动算法服务
   - `recommendation.js` - 推荐请求 API
 - `stores/` - Pinia state management (user.js)
 - `router/` - Vue Router with guards
+
+**前端动画库**:
+- GSAP - 高性能 JavaScript 动画引擎
+- Lottie-web - After Effects 动画渲染
+- Animate.css - CSS3 动画库
+- AOS (Animate On Scroll) - 滚动触发动画
+- Swiper - 触摸滑动轮播组件
+- Particles.js - 粒子背景效果
+- Typed.js - 打字机效果
 
 ### Algorithm Service Structure (recommendation-algorithm-service/)
 - `algorithms/` - **核心推荐算法**
@@ -208,6 +309,52 @@ start-algorithm.bat                    # 启动算法服务
 - 动态置信度混合：避免固定比例的弊端
 - 显式兴趣加权：用户主动选择的偏好权重更高
 - 多源融合：隐式行为（评分）+ 内容特征（TF-IDF）+ 显式偏好（兴趣）
+
+### 图书详情页动态推荐详解
+
+**适用场景**：用户浏览图书详情页，查看"相似图书推荐"
+
+**策略矩阵**：
+
+| 图书状态 | 推荐算法 | 标识符 | CF比例范围 |
+|:---|:---|:---|:---|
+| **CF有 + Content有** | **动态混合** | `dynamic_item_cf_content` | **[40%, 85%]** |
+| CF有 + Content无 | 纯协同过滤 | `item_cf_only` | 100% |
+| CF无 + Content有 | 纯内容特征 | `content_only` | 0% |
+| 两者都无 | 同作者降级 | `same_author_fallback` | 0% |
+
+**动态比例计算公式**（针对图书数据质量）：
+
+```python
+# 1. 评分数量得分
+quantity_score = min(rating_count / 500, 1.0)
+
+# 2. 协同过滤质量得分
+cf_count_score = min(cf_similar_count / 20, 1.0)
+cf_quality_score = cf_count_score × cf_avg_similarity
+
+# 3. 综合置信度
+confidence = quantity_score × cf_quality_score
+
+# 4. 动态比例
+cf_ratio = 0.40 + 0.45 × confidence  # 范围 [40%, 85%]
+content_ratio = 1.0 - cf_ratio       # 范围 [15%, 60%]
+```
+
+**示例对比**：
+
+| 图书类型 | 评分数 | 相似书数 | 平均相似度 | CF比例 | Content比例 |
+|:---|:---|:---|:---|:---|:---|
+| 超热门书 | 5000 | 50 | 0.85 | **78%** | 22% |
+| 热门书 | 800 | 35 | 0.72 | **68%** | 32% |
+| 中等热度 | 150 | 12 | 0.65 | **45%** | 55% |
+| 冷门书 | 8 | 3 | 0.40 | **40%** | 60% |
+
+**核心改进**：
+- 冷门图书（评分少）：降低协同过滤权重，依赖内容特征
+- 热门图书（评分多）：提升协同过滤权重，充分利用用户行为数据
+- 平滑过渡：避免固定比例（原7:3）带来的"一刀切"问题
+- 与个人推荐一致：两个场景都采用动态策略，论文价值高
 
 ## Database Schema
 
@@ -303,25 +450,111 @@ Apple-style minimalist design with light blue theme (#5ac8fa).
 
 ## Testing Recommendations
 
-推荐测试以下用户场景：
+### 快速启动顺序
 
-1. **有评分 + 有兴趣**
-   - 观察日志：`[三层混合]` 字样
-   - 验证推荐结果中 `interest_boosted=True` 的图书排名靠前
-   - 验证 `mixing_strategy='triple_hybrid_with_interest_boost'`
+**推荐的服务启动顺序**:
+1. **算法服务** (必须第一个启动)
+   ```bash
+   cd recommendation-algorithm-service
+   python app.py
+   ```
+   等待看到：`Running on http://127.0.0.1:5000`
 
-2. **有评分 + 无兴趣**
-   - 观察日志：`[双层混合]` 字样
-   - 验证 `mixing_strategy='dual_hybrid_cf_tfidf'`
+2. **后端服务** (依赖算法服务)
+   ```bash
+   cd book-recommendation-backend
+   mvn spring-boot:run
+   ```
+   等待看到：`Started BookRecommendationApplication`
 
-3. **无评分 + 有兴趣**
-   - 观察日志：`基于兴趣推荐` 字样
-   - 验证推荐结果中图书的 `theme_id` 在用户兴趣列表中
-   - 验证 `algorithm='interest_based'`
+3. **前端服务** (最后启动)
+   ```bash
+   cd book-recommendation-frontend
+   npm run dev
+   ```
+   访问：`http://localhost:3000`
 
-4. **冷启动用户（无评分 + 无兴趣）**
-   - 验证返回热门优质图书
-   - 验证 `algorithm='top_quality_books'`
+### 健康检查
+
+```bash
+# 检查算法服务健康状态
+curl http://localhost:5000/health
+
+# 检查后端API (需要先登录获取token)
+curl http://localhost:8080/api/books?page=1&size=10
+```
+
+### 用户场景测试
+
+推荐按以下顺序测试不同推荐策略：
+
+**1. 有评分 + 有兴趣 (三层混合推荐)**
+- 注册新用户 → 选择 5-8 个兴趣主题
+- 评分至少 10 本图书（3.5-5.0 分）
+- 访问推荐页面
+- **验证点**：
+  - 观察浏览器控制台/后端日志：`[三层混合]` 字样
+  - 推荐结果中 `interest_boosted=True` 的图书排名靠前
+  - 返回的 `mixing_strategy='triple_hybrid_with_interest_boost'`
+  - 推荐的图书 `theme_id` 应与用户兴趣重叠
+
+**2. 有评分 + 无兴趣 (双层混合推荐)**
+- 注册新用户 → 跳过兴趣选择
+- 评分至少 10 本图书
+- 访问推荐页面
+- **验证点**：
+  - 观察日志：`[双层混合]` 字样
+  - 返回的 `mixing_strategy='dual_hybrid_cf_tfidf'`
+  - 推荐结果基于评分相似用户和内容特征
+
+**3. 无评分 + 有兴趣 (兴趣主题推荐)**
+- 注册新用户 → 选择兴趣主题
+- 不进行任何评分
+- 访问推荐页面
+- **验证点**：
+  - 观察日志：`基于兴趣推荐` 字样
+  - 推荐图书的 `theme_id` 全部在用户兴趣列表中
+  - 返回的 `algorithm='interest_based'`
+
+**4. 冷启动用户 (热门优质图书)**
+- 注册新用户 → 跳过兴趣选择
+- 不进行任何评分
+- 访问推荐页面
+- **验证点**：
+  - 返回热门优质图书（avg_rating >= 4.0）
+  - 返回的 `algorithm='top_quality_books'`
+
+**5. 图书详情页 - 热门书动态推荐**
+- 访问一本热门图书详情页（如评分数 > 500）
+- 查看"相似图书推荐"
+- **验证点**：
+  - 观察日志：`[图书详情动态比例]` 字样
+  - CF比例应该较高（70%-85%）
+  - 返回的 `mixing_strategy='dynamic_item_cf_content'`
+  - `confidence_info.rating_count` 应该较大
+
+**6. 图书详情页 - 冷门书动态推荐**
+- 访问一本冷门图书详情页（如评分数 < 50）
+- 查看"相似图书推荐"
+- **验证点**：
+  - CF比例应该较低（40%-50%）
+  - Content比例应该较高（50%-60%）
+  - `confidence_info.confidence_score` 应该较低
+
+### 算法性能评估
+
+运行评估脚本查看推荐质量指标：
+```bash
+cd recommendation-algorithm-service
+python run_evaluation.py
+```
+
+**输出指标**:
+- Precision@10 (精确率)
+- Recall@10 (召回率)
+- F1-Score
+- Coverage (覆盖率)
+- 用户协同 vs TF-IDF vs 混合推荐对比
 
 ## Performance Considerations
 
@@ -330,3 +563,88 @@ Apple-style minimalist design with light blue theme (#5ac8fa).
 - 协同过滤使用稀疏矩阵优化内存
 - 推荐结果支持缓存（Redis）
 - 兴趣加权仅对最终推荐列表进行，不对全量数据操作
+
+## Troubleshooting
+
+### 常见问题
+
+**1. 后端启动失败: "Access denied for user 'root'@'...'**
+- 检查 `book-recommendation-backend/src/main/resources/application.yml` 中的数据库密码
+- 确认数据库端口：开发环境使用 `33066`
+
+**2. 算法服务启动失败: "Can't connect to MySQL server"**
+- 确保 MySQL 数据库可访问（`telnet 116.205.244.106 33066`）
+- 检查防火墙是否阻止连接
+- 验证环境变量 `DB_HOST`、`DB_PORT`、`DB_PASSWORD` 配置正确
+
+**3. 前端无法连接后端: "Network Error"**
+- 确认后端已启动（访问 `http://localhost:8080/api/docs`）
+- 检查前端 API 基础 URL 配置（应为 `http://localhost:8080/api`）
+- 验证 CORS 配置是否允许前端域名
+
+**4. 推荐接口返回空结果**
+- 查看后端日志，确认算法服务是否可达
+- 检查算法服务日志，查看是否有异常
+- 验证用户是否有评分记录或兴趣设置
+
+**5. JWT Token 过期**
+- 默认有效期为 300 天 (25920000000 毫秒)
+- 如需修改，编辑 `application.yml` 中的 `jwt.expiration`
+
+**6. Docker 部署失败**
+- 检查端口是否被占用：`netstat -ano | findstr "8080"` (Windows) 或 `lsof -i:8080` (Linux/Mac)
+- 查看具体服务日志：`docker-compose logs -f <service-name>`
+- 清理并重新构建：`docker-compose down && docker-compose build --no-cache`
+
+### 日志查看
+
+**后端日志**:
+```bash
+# Maven 启动时会在控制台输出
+# 或查看日志文件（如果配置了文件输出）
+tail -f logs/application.log
+```
+
+**算法服务日志**:
+```bash
+# Flask 默认输出到控制台
+# 日志级别: INFO
+# 关键字搜索: "[三层混合]", "[双层混合]", "ERROR"
+```
+
+**Docker 日志**:
+```bash
+docker-compose logs -f --tail=100 algorithm-service
+docker-compose logs -f --tail=100 backend
+docker-compose logs -f --tail=100 frontend
+```
+
+## Key File Paths
+
+快速定位关键配置文件:
+
+```
+book-recommendation-backend/
+├── src/main/resources/application.yml       # 后端核心配置
+├── src/main/java/com/bookrs/recommendation/
+│   ├── config/SecurityConfig.java           # JWT & Spring Security
+│   ├── config/WebConfig.java                # CORS 配置
+│   └── controller/RecommendationController.java  # 推荐API
+
+book-recommendation-frontend/
+├── src/api/user.js                          # 用户API调用
+├── src/api/recommendation.js                # 推荐API调用
+├── src/stores/user.js                       # Pinia 用户状态
+├── src/components/InterestSelector.vue      # 兴趣选择核心组件
+└── vite.config.js                           # Vite 构建配置
+
+recommendation-algorithm-service/
+├── app.py                                   # Flask API 入口
+├── config.py                                # 算法服务配置
+├── algorithms/hybrid.py                     # 三层混合推荐核心
+├── algorithms/collaborative_filtering.py    # 用户协同过滤
+├── algorithms/content_based.py              # TF-IDF 内容推荐
+└── data/data_loader.py                      # 数据库连接与加载
+
+docker-compose.yml                           # Docker 部署配置
+```
