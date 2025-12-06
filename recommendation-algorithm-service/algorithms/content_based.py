@@ -137,16 +137,22 @@ class ContentBasedRecommendation:
                 logger.error("用户向量构建失败")
                 return []
 
-            # 4. 获取候选图书（排除已评分）
+            # 4. 获取候选图书（排除已评分 + 流行度过滤）
             rated_book_ids = set(user_ratings['book_id'].values)
-            candidate_mask = ~self.books_df['book_id'].isin(rated_book_ids)
+
+            # 关键修复：加入流行度过滤，避免推荐超级冷门书
+            # 只推荐至少有10个评分的图书（保证质量）
+            candidate_mask = (
+                ~self.books_df['book_id'].isin(rated_book_ids) &
+                (self.books_df['rating_count'] >= 10)  # 流行度阈值
+            )
             candidate_indices = self.books_df[candidate_mask].index.tolist()
 
             if not candidate_indices:
-                logger.warning("没有候选图书（用户已评分所有图书）")
+                logger.warning("没有候选图书（用户已评分所有图书或无符合流行度要求的图书）")
                 return []
 
-            logger.info(f"候选图书数量: {len(candidate_indices):,}")
+            logger.info(f"候选图书数量: {len(candidate_indices):,}（已过滤rating_count<10的冷门书）")
 
             # 5. 批量计算余弦相似度（矩阵运算，速度快）
             candidate_features = self.book_features[candidate_indices]
