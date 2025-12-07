@@ -74,9 +74,9 @@
             class="rating-item"
           >
             <div class="user-info">
-              <el-avatar :size="40">{{ rating.userId }}</el-avatar>
+              <el-avatar :size="40">{{ rating.username?.substring(0, 2) || 'U' }}</el-avatar>
               <div class="user-details">
-                <span class="username">用户{{ rating.userId }}</span>
+                <span class="username">{{ rating.username || `用户${rating.userId}` }}</span>
                 <span class="user-location">{{ rating.location || rating.country || '未知地区' }}</span>
               </div>
             </div>

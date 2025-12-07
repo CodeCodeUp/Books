@@ -23,7 +23,11 @@
       
       <el-form :inline="true" :model="recommendForm" class="recommend-form">
         <el-form-item label="推荐数量">
-          <el-select v-model="recommendForm.topN">
+          <el-select
+            v-model="recommendForm.topN"
+            placeholder="请选择推荐数量"
+            style="width: 120px"
+          >
             <el-option label="5本" :value="5" />
             <el-option label="10本" :value="10" />
             <el-option label="15本" :value="15" />
@@ -32,7 +36,11 @@
         </el-form-item>
 
         <el-form-item label="最低评分">
-          <el-select v-model="recommendForm.minRating">
+          <el-select
+            v-model="recommendForm.minRating"
+            placeholder="请选择最低评分"
+            style="width: 140px"
+          >
             <el-option label="2.0分以上" :value="2.0" />
             <el-option label="3.0分以上" :value="3.0" />
             <el-option label="3.5分以上" :value="3.5" />
@@ -61,12 +69,12 @@
       </div>
       
       <div class="book-grid" v-loading="loading" element-loading-text="正在生成个性化推荐...">
-        <div 
-          v-for="item in recommendations" 
+        <div
+          v-for="item in recommendations"
           :key="item.bookId"
           class="recommendation-item"
         >
-          <BookCard :book="item" :enhanced="true" />
+          <BookCard :book="item" />
         </div>
       </div>
     </div>
