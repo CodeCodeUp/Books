@@ -15,6 +15,7 @@
           <p class="author">作者：{{ book.author || '未知' }}</p>
           <p class="publisher">出版社：{{ book.publisher || '未知' }}</p>
           <p class="year">出版年份：{{ book.year || '未知' }}</p>
+          <p class="theme" v-if="book.themeName">            <span class="label">图书类型：</span>            <el-tag type="primary" effect="dark">{{ book.themeName }}</el-tag>          </p>
           
           <div class="rating-section">
             <div class="rating-display">

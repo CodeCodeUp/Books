@@ -31,7 +31,14 @@
       <div class="book-info">
         <h3 class="book-title" :title="book.title">{{ book.title }}</h3>
         <p class="book-author" :title="book.author">{{ book.author || '未知作者' }}</p>
-        
+
+        <!-- 类型标签 -->
+        <div v-if="book.themeName" class="book-theme">
+          <el-tag size="small" type="info">
+            {{ book.themeName }}
+          </el-tag>
+        </div>
+
         <div class="book-meta">
           <div class="book-year" v-if="book.year">
             <el-icon><Calendar /></el-icon>
@@ -324,6 +331,22 @@ const handleQuickAction = (action) => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-weight: 400;
+}
+
+/* 类型标签 */
+.book-theme {
+  margin: 8px 0 12px 0;
+  text-align: center;
+}
+
+.book-theme .el-tag {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
 }
 
 /* 图书元数据 */
