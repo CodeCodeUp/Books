@@ -22,17 +22,18 @@ public class RecommendationService {
     private final RestTemplate restTemplate = new RestTemplate();
     
     /**
-     * 基于用户的协同过滤推荐
+     * 基于用户的协同过滤推荐（支持分页）
      */
-    public Map<String, Object> getUserBasedRecommendations(Integer userId, Integer topN, Double minRating) {
-        log.info("调用用户协同过滤推荐: userId={}, topN={}, minRating={}", userId, topN, minRating);
-        
+    public Map<String, Object> getUserBasedRecommendations(Integer userId, Integer topN, Integer offset, Double minRating) {
+        log.info("调用用户协同过滤推荐: userId={}, topN={}, offset={}, minRating={}", userId, topN, offset, minRating);
+
         try {
             String url = algorithmServiceUrl + "/api/recommend/user-based";
-            
+
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("user_id", userId);
             requestBody.put("top_n", topN != null ? topN : 10);
+            requestBody.put("offset", offset != null ? offset : 0);
             requestBody.put("min_rating", minRating != null ? minRating : 3.0);
             
             HttpHeaders headers = new HttpHeaders();

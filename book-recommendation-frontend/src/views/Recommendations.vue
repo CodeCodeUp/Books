@@ -49,9 +49,9 @@
         </el-form-item>
         
         <el-form-item>
-          <el-button 
-            type="primary" 
-            @click="generateRecommendations"
+          <el-button
+            type="primary"
+            @click="resetRecommendations"
             :loading="loading"
             icon="Refresh"
           >
@@ -65,9 +65,19 @@
     <div v-if="recommendations.length > 0 || loading" class="recommendations-section">
       <div class="section-header">
         <h2>为您推荐</h2>
-        <el-tag type="info" v-if="!loading">{{ algorithmInfo }}</el-tag>
+        <div class="header-actions">
+          <el-button
+            v-if="!loading && total > recommendForm.topN"
+            type="primary"
+            size="small"
+            @click="loadNextPage"
+            icon="RefreshRight"
+          >
+            换一批
+          </el-button>
+        </div>
       </div>
-      
+
       <div class="book-grid" v-loading="loading" element-loading-text="正在生成个性化推荐...">
         <div
           v-for="item in recommendations"
@@ -127,6 +137,10 @@ const recommendations = ref([])
 const similarUsers = ref([])
 const algorithmInfo = ref('')
 
+// 分页相关状态
+const currentOffset = ref(0)
+const total = ref(0)
+
 const recommendForm = reactive({
   topN: 10,
   minRating: 3.0
@@ -142,29 +156,27 @@ const checkServiceHealth = async () => {
   }
 }
 
-const generateRecommendations = async () => {
+const generateRecommendations = async (offset = 0) => {
   if (!userStore.user) {
     ElMessage.error('请先登录')
     return
   }
-  
+
   loading.value = true
   try {
-    // 生成推荐
     const response = await recommendApi.getUserBasedRecommendations(
       userStore.user.userId,
       recommendForm.topN,
+      offset,
       recommendForm.minRating
     )
-    
+
     recommendations.value = response.data.recommendations || []
+    total.value = response.data.total || 0
+    currentOffset.value = offset
     algorithmInfo.value = response.data.algorithm_info?.name || '混合推荐算法'
-    
-    // 暂时不显示相似用户模块
     similarUsers.value = []
-    
-    ElMessage.success(`成功生成${recommendations.value.length}个推荐`)
-    
+
   } catch (error) {
     ElMessage.error('生成推荐失败，请检查算法服务是否运行')
   } finally {
@@ -172,10 +184,25 @@ const generateRecommendations = async () => {
   }
 }
 
+// 换一批：自动循环
+const loadNextPage = () => {
+  let nextOffset = currentOffset.value + recommendForm.topN
+  // 超过总数则从头开始
+  if (nextOffset >= total.value) {
+    nextOffset = 0
+  }
+  generateRecommendations(nextOffset)
+}
+
+// 从头开始
+const resetRecommendations = () => {
+  generateRecommendations(0)
+}
+
 onMounted(() => {
   checkServiceHealth()
   if (userStore.isLoggedIn) {
-    generateRecommendations()
+    generateRecommendations(0)
   }
 })
 </script>
@@ -221,11 +248,19 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .section-header h2 {
   color: #333;
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .book-grid {

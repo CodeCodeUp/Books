@@ -1,10 +1,10 @@
 import request from '../utils/request'
 
 export const recommendApi = {
-  // 基于用户的协同过滤推荐
-  getUserBasedRecommendations(userId, topN = 10, minRating = 3.0) {
+  // 基于用户的协同过滤推荐（支持分页）
+  getUserBasedRecommendations(userId, topN = 10, offset = 0, minRating = 3.0) {
     return request.post('/recommendations/user-based', null, {
-      params: { userId, topN, minRating }
+      params: { userId, topN, offset, minRating }
     })
   },
   

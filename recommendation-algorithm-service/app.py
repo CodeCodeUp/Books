@@ -38,42 +38,66 @@ def health_check():
 
 @app.route('/api/recommend/user-based', methods=['POST'])
 def recommend_user_based():
-    """混合推荐：用户协同过滤 + 内容特征"""
+    """混合推荐：用户协同过滤 + 内容特征（支持分页）"""
     try:
         # 获取请求参数
         data = request.get_json()
         user_id = data.get('user_id')
-        top_n = data.get('top_n', Config.DEFAULT_TOP_N)
+        top_n = data.get('top_n', Config.DEFAULT_TOP_N)  # 每页数量
+        offset = data.get('offset', 0)  # 分页偏移量
         min_rating = data.get('min_rating', 3.0)
-        
+
+        # 预生成的完整推荐列表大小
+        FULL_CACHE_SIZE = 50
+
         if not user_id:
             return jsonify({
                 'success': False,
                 'message': 'user_id参数必须提供'
             }), 400
-        
-        logger.info(f"收到混合推荐请求: user_id={user_id}, top_n={top_n}, min_rating={min_rating}")
-        
-        # 使用混合推荐策略
-        recommendations = hybrid.get_hybrid_user_recommendations(
-            user_id=user_id,
-            top_n=top_n
-        )
-        
+
+        logger.info(f"收到混合推荐请求: user_id={user_id}, top_n={top_n}, offset={offset}")
+
+        # 1. 尝试从缓存加载完整推荐列表
+        full_recommendations = user_cf.cache.load_recommendations(user_id, max_age=3600)
+
+        # 2. 缓存不存在或已过期，重新生成完整列表
+        if not full_recommendations:
+            logger.info(f"缓存未命中，为用户 {user_id} 生成 {FULL_CACHE_SIZE} 本推荐...")
+            full_recommendations = hybrid.get_hybrid_user_recommendations(
+                user_id=user_id,
+                top_n=FULL_CACHE_SIZE  # 一次性生成50本
+            )
+            # 保存到缓存
+            user_cf.cache.save_recommendations(user_id, full_recommendations, 'hybrid_paged')
+            logger.info(f"已缓存用户 {user_id} 的 {len(full_recommendations)} 本推荐")
+        else:
+            logger.info(f"缓存命中，用户 {user_id} 已有 {len(full_recommendations)} 本推荐")
+
+        # 3. 按 offset 分页切片
+        total = len(full_recommendations)
+        page_recommendations = full_recommendations[offset : offset + top_n]
+        has_more = offset + top_n < total
+
+        logger.info(f"返回分页结果: offset={offset}, 本页={len(page_recommendations)}本, 总计={total}本, 还有更多={has_more}")
+
         return jsonify({
             'success': True,
             'data': {
                 'user_id': user_id,
-                'recommendations': recommendations,
-                'total': len(recommendations),
+                'recommendations': page_recommendations,
+                'total': total,
+                'offset': offset,
+                'page_size': len(page_recommendations),
+                'has_more': has_more,
                 'algorithm_info': {
                     'name': '动态比例混合推荐算法',
                     'type': 'hybrid_recommendation_dynamic',
                     'description': '协同过滤50%-90% + 内容特征10%-50%（根据协同过滤置信度自动调节）',
-                    'feature': '基于相似用户数量和平均相似度的动态比例计算'
+                    'feature': '支持分页浏览，预生成50本推荐'
                 }
             },
-            'message': f'成功生成{len(recommendations)}个动态混合推荐'
+            'message': f'成功获取第{offset // top_n + 1}页推荐（{len(page_recommendations)}本）'
         })
         
     except Exception as e:

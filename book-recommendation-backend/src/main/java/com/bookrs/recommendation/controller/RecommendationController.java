@@ -18,14 +18,15 @@ public class RecommendationController {
     private final RecommendationService recommendationService;
     
     @PostMapping("/user-based")
-    @Operation(summary = "基于用户的协同过滤推荐")
+    @Operation(summary = "基于用户的协同过滤推荐（支持分页）")
     public Result<Object> getUserBasedRecommendations(
             @RequestParam Integer userId,
             @RequestParam(defaultValue = "10") Integer topN,
+            @RequestParam(defaultValue = "0") Integer offset,
             @RequestParam(defaultValue = "3.0") Double minRating) {
-        
-        Map<String, Object> result = recommendationService.getUserBasedRecommendations(userId, topN, minRating);
-        
+
+        Map<String, Object> result = recommendationService.getUserBasedRecommendations(userId, topN, offset, minRating);
+
         if (Boolean.TRUE.equals(result.get("success"))) {
             return Result.success("推荐生成成功", result.get("data"));
         } else {
