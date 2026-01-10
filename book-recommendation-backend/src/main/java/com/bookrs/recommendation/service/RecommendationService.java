@@ -144,38 +144,39 @@ public class RecommendationService {
             return createErrorResponse("推荐服务暂时不可用");
         }
     }
-    
+
     /**
-     * 获取相似图书（物品协同过滤）
+     * 获取相似图书（物品协同过滤，支持分页）
      */
-    public Map<String, Object> getSimilarBooks(String bookId, Integer limit) {
-        log.info("获取相似图书: bookId={}, limit={}", bookId, limit);
-        
+    public Map<String, Object> getSimilarBooks(String bookId, Integer limit, Integer offset) {
+        log.info("获取相似图书: bookId={}, limit={}, offset={}", bookId, limit, offset);
+
         try {
             String url = algorithmServiceUrl + "/api/recommend/similar-items";
-            
+
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("item_id", bookId);
             requestBody.put("top_k", limit != null ? limit : 6);
-            
+            requestBody.put("offset", offset != null ? offset : 0);
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            
+
             HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
-            
+
             ResponseEntity<Map> response = restTemplate.exchange(
-                url, 
-                HttpMethod.POST, 
-                requestEntity, 
+                url,
+                HttpMethod.POST,
+                requestEntity,
                 Map.class
             );
-            
+
             if (response.getStatusCode() == HttpStatus.OK) {
                 return response.getBody();
             }
-            
+
             return createErrorResponse("获取相似图书失败");
-            
+
         } catch (Exception e) {
             log.error("获取相似图书失败", e);
             return createErrorResponse("推荐服务暂时不可用");

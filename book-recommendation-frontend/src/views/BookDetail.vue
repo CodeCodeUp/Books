@@ -102,12 +102,23 @@
     <!-- 相似图书推荐 -->
     <el-card v-if="similarBooks.length > 0 || similarBooksLoading" class="similar-books-card">
       <template #header>
-        <h3>
-          <el-icon><Connection /></el-icon>
-          喜欢这本书的用户也喜欢
-        </h3>
+        <div class="similar-header">
+          <h3>
+            <el-icon><Connection /></el-icon>
+            喜欢这本书的用户也喜欢
+          </h3>
+          <el-button
+            v-if="!similarBooksLoading && similarBooksTotal > 6"
+            type="primary"
+            size="small"
+            @click="loadNextSimilarBooks"
+            icon="RefreshRight"
+          >
+            换一批
+          </el-button>
+        </div>
       </template>
-      
+
       <div class="similar-books-grid" v-loading="similarBooksLoading" element-loading-text="正在分析相似图书...">
         <div 
           v-for="book in similarBooks" 
@@ -164,6 +175,10 @@ const similarBooksLoading = ref(false)
 const showAllRatings = ref(false)
 const showRatings = ref(false)  // 控制用户评分显示/隐藏
 
+// 相似图书分页状态
+const similarBooksOffset = ref(0)
+const similarBooksTotal = ref(0)
+
 const displayRating = computed(() => {
   return book.value?.avgRating || 0
 })
@@ -218,15 +233,18 @@ const toggleRatingsDisplay = async () => {
   }
 }
 
-const loadSimilarBooks = async () => {
+const loadSimilarBooks = async (offset = 0) => {
   similarBooksLoading.value = true
   try {
-    const response = await bookApi.getSimilarBooks(route.params.bookId, null, 6)
+    const response = await bookApi.getSimilarBooks(route.params.bookId, 6, offset)
     // 处理返回的数据结构
     if (response.data && response.data.similar_books) {
       similarBooks.value = response.data.similar_books
+      similarBooksTotal.value = response.data.total || 0
+      similarBooksOffset.value = offset
     } else {
       similarBooks.value = response.data || []
+      similarBooksTotal.value = 0
     }
   } catch (error) {
     console.log('加载相似图书失败，可能是算法服务未启动')
@@ -234,6 +252,16 @@ const loadSimilarBooks = async () => {
   } finally {
     similarBooksLoading.value = false
   }
+}
+
+// 换一批：自动循环
+const loadNextSimilarBooks = () => {
+  let nextOffset = similarBooksOffset.value + 6
+  // 超过总数则从头开始
+  if (nextOffset >= similarBooksTotal.value) {
+    nextOffset = 0
+  }
+  loadSimilarBooks(nextOffset)
 }
 
 const loadBookRatings = async () => {
@@ -307,10 +335,12 @@ watch(() => route.params.bookId, (newBookId) => {
     book.value = null
     userRating.value = 0
     similarBooks.value = []
+    similarBooksOffset.value = 0
+    similarBooksTotal.value = 0
     bookRatings.value = []
     showRatings.value = false
     showAllRatings.value = false
-    
+
     // 重新加载数据
     loadBookDetail()
   }
@@ -386,6 +416,19 @@ watch(() => route.params.bookId, (newBookId) => {
 
 .similar-books-card {
   margin-top: 30px;
+}
+
+.similar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.similar-header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .similar-books-grid {

@@ -154,29 +154,55 @@ def recommend_item_based():
             'message': f'推荐生成失败: {str(e)}'
         }), 500
 
+# 图书相似推荐缓存（内存缓存）
+similar_books_cache = {}
+SIMILAR_CACHE_SIZE = 24  # 预生成24本相似图书
+
 @app.route('/api/recommend/similar-items', methods=['POST'])
 def get_similar_items():
-    """混合相似图书：物品协同过滤 + 内容特征"""
+    """混合相似图书：物品协同过滤 + 内容特征（支持分页）"""
     try:
         data = request.get_json()
         item_id = data.get('item_id')
-        top_k = data.get('top_k', 6)
-        
+        top_k = data.get('top_k', 6)  # 每页数量
+        offset = data.get('offset', 0)  # 分页偏移量
+
         if not item_id:
             return jsonify({
                 'success': False,
                 'message': 'item_id参数必须提供'
             }), 400
-        
-        # 使用混合相似图书推荐
-        similar_books = hybrid.get_hybrid_similar_books(item_id, top_k)
-        
+
+        logger.info(f"收到相似图书请求: item_id={item_id}, top_k={top_k}, offset={offset}")
+
+        # 1. 尝试从缓存获取完整列表
+        cache_key = f"book_{item_id}"
+        full_similar_books = similar_books_cache.get(cache_key)
+
+        # 2. 缓存不存在，生成完整列表
+        if not full_similar_books:
+            logger.info(f"缓存未命中，为图书 {item_id} 生成 {SIMILAR_CACHE_SIZE} 本相似推荐...")
+            full_similar_books = hybrid.get_hybrid_similar_books(item_id, SIMILAR_CACHE_SIZE)
+            similar_books_cache[cache_key] = full_similar_books
+            logger.info(f"已缓存图书 {item_id} 的 {len(full_similar_books)} 本相似推荐")
+        else:
+            logger.info(f"缓存命中，图书 {item_id} 已有 {len(full_similar_books)} 本相似推荐")
+
+        # 3. 按 offset 分页切片
+        total = len(full_similar_books)
+        page_similar_books = full_similar_books[offset : offset + top_k]
+        has_more = offset + top_k < total
+
+        logger.info(f"返回分页结果: offset={offset}, 本页={len(page_similar_books)}本, 总计={total}本")
+
         return jsonify({
             'success': True,
             'data': {
                 'item_id': item_id,
-                'similar_books': similar_books,
-                'total': len(similar_books)
+                'similar_books': page_similar_books,
+                'total': total,
+                'offset': offset,
+                'has_more': has_more
             }
         })
         

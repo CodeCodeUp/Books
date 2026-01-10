@@ -27,10 +27,10 @@ export const bookApi = {
     })
   },
   
-  // 获取相似图书
-  getSimilarBooks(bookId, userId = null, limit = 6) {
+  // 获取相似图书（支持分页）
+  getSimilarBooks(bookId, limit = 6, offset = 0) {
     return request.get(`/books/${bookId}/similar`, {
-      params: { userId, limit }
+      params: { limit, offset }
     })
   },
   

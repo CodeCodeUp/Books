@@ -65,16 +65,17 @@ public class BookController {
         List<Book> books = bookService.getLatestBooks(limit);
         return Result.success(books);
     }
-    
+
     @GetMapping("/{bookId}/similar")
-    @Operation(summary = "获取相似图书推荐")
+    @Operation(summary = "获取相似图书推荐（支持分页）")
     public Result<Object> getSimilarBooks(
             @PathVariable String bookId,
-            @RequestParam(defaultValue = "6") Integer limit) {
-        
+            @RequestParam(defaultValue = "6") Integer limit,
+            @RequestParam(defaultValue = "0") Integer offset) {
+
         // 优先使用物品协同过滤
-        Map<String, Object> result = recommendationService.getSimilarBooks(bookId, limit);
-        
+        Map<String, Object> result = recommendationService.getSimilarBooks(bookId, limit, offset);
+
         if (Boolean.TRUE.equals(result.get("success"))) {
             return Result.success("获取相似图书成功", result.get("data"));
         } else {
