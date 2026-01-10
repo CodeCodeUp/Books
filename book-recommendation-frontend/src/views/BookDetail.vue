@@ -1,51 +1,56 @@
 <template>
-  <div class="book-detail" v-loading="loading">
-    <el-card v-if="book">
-      <div class="book-content">
-        <div class="book-image">
-          <img 
-            :src="book.imageUrlL || '/default-book.jpg'" 
-            :alt="book.title"
-            @error="handleImageError"
-          />
-        </div>
-        
-        <div class="book-info">
-          <h1>{{ book.title }}</h1>
-          <p class="author">作者：{{ book.author || '未知' }}</p>
-          <p class="publisher">出版社：{{ book.publisher || '未知' }}</p>
-          <p class="year">出版年份：{{ book.year || '未知' }}</p>
-          <p class="theme" v-if="book.themeName">            <span class="label">图书类型：</span>            <el-tag type="primary" effect="dark">{{ book.themeName }}</el-tag>          </p>
-          
-          <div class="rating-section">
-            <div class="rating-display">
-              <el-rate 
-                v-model="displayRating" 
-                disabled 
-                show-score 
-                :score-template="`${book.avgRating || 0}`"
+  <div class="book-detail">
+    <Transition name="fade" mode="out-in">
+      <div v-if="loading" class="page-loading-container" key="loading">
+        <HourglassLoader text="加载图书详情..." size="72px" />
+      </div>
+      <div v-else key="content">
+        <el-card v-if="book">
+          <div class="book-content">
+            <div class="book-image">
+              <img
+                :src="book.imageUrlL || '/default-book.jpg'"
+                :alt="book.title"
+                @error="handleImageError"
               />
-              <span class="rating-text">
-                {{ book.avgRating || 0 }}分 ({{ book.ratingCount || 0 }}人评价)
-              </span>
             </div>
-            
-            <!-- 用户评分功能 -->
-            <div class="user-rating" v-if="userStore.isLoggedIn">
-              <span>我的评分：</span>
-              <el-rate 
-                v-model="userRating" 
-                @change="handleRating"
-                :allow-half="true"
-                :max="5"
-                show-score
-              />
-              <span class="rating-tip">支持0.5分间隔评分</span>
+
+            <div class="book-info">
+              <h1>{{ book.title }}</h1>
+              <p class="author">作者：{{ book.author || '未知' }}</p>
+              <p class="publisher">出版社：{{ book.publisher || '未知' }}</p>
+              <p class="year">出版年份：{{ book.year || '未知' }}</p>
+              <p class="theme" v-if="book.themeName">            <span class="label">图书类型：</span>            <el-tag type="primary" effect="dark">{{ book.themeName }}</el-tag>          </p>
+
+              <div class="rating-section">
+                <div class="rating-display">
+                  <el-rate
+                    v-model="displayRating"
+                    disabled
+                    show-score
+                    :score-template="`${book.avgRating || 0}`"
+                  />
+                  <span class="rating-text">
+                    {{ book.avgRating || 0 }}分 ({{ book.ratingCount || 0 }}人评价)
+                  </span>
+                </div>
+
+                <!-- 用户评分功能 -->
+                <div class="user-rating" v-if="userStore.isLoggedIn">
+                  <span>我的评分：</span>
+                  <el-rate
+                    v-model="userRating"
+                    @change="handleRating"
+                    :allow-half="true"
+                    :max="5"
+                    show-score
+                  />
+                  <span class="rating-tip">支持0.5分间隔评分</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    </el-card>
+        </el-card>
     
     <!-- 用户评分区域（默认隐藏，点击显示） -->
     <el-card class="user-ratings-section">
@@ -67,35 +72,39 @@
         </div>
       </template>
       
-      <div v-if="showRatings" class="ratings-content" v-loading="ratingsLoading" element-loading-text="加载用户评分中...">
-        <div v-if="bookRatings.length > 0" class="ratings-list">
-          <div 
-            v-for="rating in (showAllRatings ? bookRatings : bookRatings.slice(0, 10))" 
-            :key="rating.ratingId"
-            class="rating-item"
-          >
-            <div class="user-info">
-              <el-avatar :size="40">{{ rating.username?.substring(0, 2) || 'U' }}</el-avatar>
-              <div class="user-details">
-                <span class="username">{{ rating.username || `用户${rating.userId}` }}</span>
-                <span class="user-location">{{ rating.location || rating.country || '未知地区' }}</span>
+      <div v-if="showRatings" class="ratings-content">
+        <Transition name="fade" mode="out-in">
+          <div v-if="ratingsLoading" class="ratings-loading-container" key="ratings-loading">
+            <HourglassLoader text="加载用户评分..." size="48px" />
+          </div>
+          <div v-else-if="bookRatings.length > 0" class="ratings-list" key="ratings-list">
+            <div
+              v-for="rating in (showAllRatings ? bookRatings : bookRatings.slice(0, 10))"
+              :key="rating.ratingId"
+              class="rating-item"
+            >
+              <div class="user-info">
+                <el-avatar :size="40">{{ rating.username?.substring(0, 2) || 'U' }}</el-avatar>
+                <div class="user-details">
+                  <span class="username">{{ rating.username || `用户${rating.userId}` }}</span>
+                  <span class="user-location">{{ rating.location || rating.country || '未知地区' }}</span>
+                </div>
+              </div>
+              <div class="rating-content">
+                <el-rate :model-value="parseFloat(rating.rating)" disabled size="small" />
+                <span class="rating-value">{{ rating.rating }}分</span>
+                <span class="rating-date">{{ formatDate(rating.ratingDate) }}</span>
               </div>
             </div>
-            <div class="rating-content">
-              <el-rate :model-value="parseFloat(rating.rating)" disabled size="small" />
-              <span class="rating-value">{{ rating.rating }}分</span>
-              <span class="rating-date">{{ formatDate(rating.ratingDate) }}</span>
+
+            <div v-if="bookRatings.length > 10" class="more-ratings">
+              <el-button text @click="showAllRatings = !showAllRatings">
+                {{ showAllRatings ? '收起' : `查看全部${bookRatings.length}条评分` }}
+              </el-button>
             </div>
           </div>
-          
-          <div v-if="bookRatings.length > 10" class="more-ratings">
-            <el-button text @click="showAllRatings = !showAllRatings">
-              {{ showAllRatings ? '收起' : `查看全部${bookRatings.length}条评分` }}
-            </el-button>
-          </div>
-        </div>
-        
-        <el-empty v-else description="暂无用户评分" :image-size="80" />
+          <el-empty v-else description="暂无用户评分" :image-size="80" key="ratings-empty" />
+        </Transition>
       </div>
     </el-card>
     
@@ -112,44 +121,57 @@
             type="primary"
             size="small"
             @click="loadNextSimilarBooks"
-            icon="RefreshRight"
+            class="tactile-btn"
           >
+            <el-icon :class="{ 'is-rotating': similarBooksLoading }"><RefreshRight /></el-icon>
             换一批
           </el-button>
         </div>
       </template>
 
-      <div class="similar-books-grid" v-loading="similarBooksLoading" element-loading-text="正在分析相似图书...">
-        <div 
-          v-for="book in similarBooks" 
-          :key="book.bookId || book.book_id"
-          class="similar-book-item"
-          @click="goToBook(book.bookId || book.book_id)"
+      <Transition name="fade" mode="out-in">
+        <div v-if="similarBooksLoading" class="loading-container" key="loading">
+          <HourglassLoader text="正在分析相似图书..." size="56px" />
+        </div>
+        <div
+          v-else
+          class="similar-books-grid"
+          :key="similarBooksOffset"
         >
-          <div class="book-cover">
-            <img 
-              :src="book.imageUrlM || book.image_url_m || '/default-book.jpg'" 
-              :alt="book.title"
-              @error="handleImageError"
-            />
-          </div>
-          <div class="book-info">
-            <h4 class="book-title">{{ book.title }}</h4>
-            <p class="book-author">{{ book.author || '未知作者' }}</p>
-            <div class="book-rating">
-              <el-rate 
-                :model-value="book.avgRating || book.avg_rating || 0" 
-                disabled 
-                size="small"
+          <div
+            v-for="(book, index) in similarBooks"
+            :key="book.bookId || book.book_id"
+            class="similar-book-item"
+            :style="{ animationDelay: `${index * 0.08}s` }"
+            @click="goToBook(book.bookId || book.book_id)"
+          >
+            <div class="book-cover">
+              <img
+                :src="book.imageUrlM || book.image_url_m || '/default-book.jpg'"
+                :alt="book.title"
+                @error="handleImageError"
               />
-              <span class="rating-text">{{ book.avgRating || book.avg_rating || 0 }}</span>
+            </div>
+            <div class="book-info">
+              <h4 class="book-title">{{ book.title }}</h4>
+              <p class="book-author">{{ book.author || '未知作者' }}</p>
+              <div class="book-rating">
+                <el-rate
+                  :model-value="book.avgRating || book.avg_rating || 0"
+                  disabled
+                  size="small"
+                />
+                <span class="rating-text">{{ book.avgRating || book.avg_rating || 0 }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </el-card>
-    
-    <el-empty v-else-if="!loading" description="图书不存在" />
+
+        <el-empty v-if="!book" description="图书不存在" />
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -160,6 +182,8 @@ import { useUserStore } from '../stores/user'
 import { bookApi } from '../api/book'
 import { ratingApi } from '../api/rating'
 import { ElMessage } from 'element-plus'
+import { RefreshRight, Connection, Comment } from '@element-plus/icons-vue'
+import HourglassLoader from '../components/HourglassLoader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -353,6 +377,25 @@ watch(() => route.params.bookId, (newBookId) => {
   margin: 0 auto;
 }
 
+/* 页面加载容器 */
+.page-loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+}
+
+/* 评分加载容器 */
+.ratings-loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+}
+
 .book-content {
   display: flex;
   gap: 30px;
@@ -431,10 +474,59 @@ watch(() => route.params.bookId, (newBookId) => {
   gap: 8px;
 }
 
+/* 触觉反馈按钮 */
+.tactile-btn {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tactile-btn:active {
+  transform: scale(0.95);
+}
+
+.tactile-btn:hover {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.tactile-btn .el-icon {
+  margin-right: 4px;
+  transition: transform 0.3s ease;
+}
+
+.tactile-btn .el-icon.is-rotating {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 淡入淡出过渡 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 .similar-books-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 20px;
+}
+
+/* 加载容器 */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
 }
 
 .similar-book-item {
@@ -443,6 +535,20 @@ watch(() => route.params.bookId, (newBookId) => {
   padding: 10px;
   border-radius: 8px;
   transition: transform 0.2s, box-shadow 0.2s;
+  /* 卡片入场动画 */
+  animation: slideUp 0.4s ease forwards;
+  opacity: 0;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .similar-book-item:hover {

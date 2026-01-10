@@ -51,39 +51,49 @@
           <h2 class="section-title">热门推荐</h2>
           <p class="section-subtitle">精选高评分图书为你推荐</p>
         </div>
-        <div class="book-container" v-loading="popularLoading">
-          <div class="book-grid">
-            <div 
-              v-for="(book, index) in popularBooks" 
-              :key="book.bookId"
-              class="book-item"
-              :data-aos="'fade-up'"
-              :data-aos-delay="index * 100"
-            >
-              <BookCard :book="book" />
+        <div class="book-container">
+          <Transition name="fade" mode="out-in">
+            <div v-if="popularLoading" class="loading-container" key="loading">
+              <HourglassLoader text="加载热门图书..." size="64px" />
             </div>
-          </div>
+            <div v-else class="book-grid" key="content">
+              <div
+                v-for="(book, index) in popularBooks"
+                :key="book.bookId"
+                class="book-item"
+                :data-aos="'fade-up'"
+                :data-aos-delay="index * 100"
+              >
+                <BookCard :book="book" />
+              </div>
+            </div>
+          </Transition>
         </div>
       </div>
-      
+
       <!-- 最新图书区域 -->
       <div class="book-section" data-aos="fade-up">
         <div class="section-header">
           <h2 class="section-title">最新上架</h2>
           <p class="section-subtitle">发现新鲜好书，拓展阅读视野</p>
         </div>
-        <div class="book-container" v-loading="latestLoading">
-          <div class="book-grid">
-            <div 
-              v-for="(book, index) in latestBooks" 
-              :key="book.bookId"
-              class="book-item"
-              :data-aos="'fade-up'"
-              :data-aos-delay="index * 100"
-            >
-              <BookCard :book="book" />
+        <div class="book-container">
+          <Transition name="fade" mode="out-in">
+            <div v-if="latestLoading" class="loading-container" key="loading">
+              <HourglassLoader text="加载最新图书..." size="64px" />
             </div>
-          </div>
+            <div v-else class="book-grid" key="content">
+              <div
+                v-for="(book, index) in latestBooks"
+                :key="book.bookId"
+                class="book-item"
+                :data-aos="'fade-up'"
+                :data-aos-delay="index * 100"
+              >
+                <BookCard :book="book" />
+              </div>
+            </div>
+          </Transition>
         </div>
       </div>
       
@@ -129,6 +139,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import { useUserStore } from '../stores/user'
 import { bookApi } from '../api/book'
 import BookCard from '../components/BookCard.vue'
+import HourglassLoader from '../components/HourglassLoader.vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 
@@ -377,6 +388,25 @@ onMounted(async () => {
   padding: 40px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+/* 加载容器 */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+/* 淡入淡出过渡 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .book-grid {

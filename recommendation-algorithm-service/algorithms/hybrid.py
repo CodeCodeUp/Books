@@ -34,7 +34,7 @@ class HybridRecommendation:
 
         logger.info("混合推荐算法 - 数据加载完成")
     
-    def get_hybrid_user_recommendations(self, user_id, top_n=10, cf_ratio=0.7):
+    def get_hybrid_user_recommendations(self, user_id, top_n=10, cf_ratio=0.7, min_rating=3.0):
         """
         混合推荐：用户协同过滤 + 内容特征 (推荐页面使用)
 
@@ -47,11 +47,12 @@ class HybridRecommendation:
             user_id: 用户ID
             top_n: 推荐数量
             cf_ratio: (已弃用) 保留用于API兼容性，实际使用动态计算
+            min_rating: 最低评分阈值，筛选预测评分高于此值的图书
 
         返回:
             list: 推荐列表，每个推荐包含置信度信息
         """
-        logger.info(f"为用户 {user_id} 生成动态比例混合推荐 (协同过滤比例将自动计算)")
+        logger.info(f"为用户 {user_id} 生成动态比例混合推荐 (min_rating={min_rating})")
 
         try:
             # 1. 检查用户是否有评分历史
@@ -78,17 +79,17 @@ class HybridRecommendation:
                 if has_interests:
                     # 有兴趣：使用三层混合推荐（CF + TF-IDF + 兴趣加权）
                     logger.info("用户有评分历史和兴趣，使用三层混合推荐（CF + TF-IDF + 兴趣加权）")
-                    return self._get_triple_hybrid_recommendations(user_id, user_info, top_n)
+                    return self._get_triple_hybrid_recommendations(user_id, user_info, top_n, min_rating)
                 else:
                     # 只有年龄：使用双层混合推荐（CF + TF-IDF）
                     logger.info("用户有评分历史和年龄（无兴趣），使用双层混合推荐（CF + TF-IDF）")
-                    return self._get_dual_hybrid_recommendations(user_id, top_n)
+                    return self._get_dual_hybrid_recommendations(user_id, top_n, min_rating)
 
             elif has_ratings:
                 # 情况2: 有评分无特征 - 协同过滤 + TF-IDF内容特征混合
                 logger.info("用户有评分历史但无特征信息（年龄/兴趣），使用协同过滤 + TF-IDF内容特征混合")
 
-                cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
+                cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2, min_rating)
                 logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
 
                 # 使用TF-IDF内容特征推荐（基于评分历史，不需要用户特征）
@@ -151,7 +152,7 @@ class HybridRecommendation:
             logger.error(f"混合推荐失败: {e}")
             return self._get_fallback_recommendations(top_n)
 
-    def _get_triple_hybrid_recommendations(self, user_id, user_info, top_n):
+    def _get_triple_hybrid_recommendations(self, user_id, user_info, top_n, min_rating=3.0):
         """
         三层混合推荐：CF + TF-IDF + 兴趣加权
 
@@ -166,13 +167,14 @@ class HybridRecommendation:
             user_id: 用户ID
             user_info: 用户信息（包含兴趣列表）
             top_n: 推荐数量
+            min_rating: 最低评分阈值
 
         返回:
             list: 混合推荐结果
         """
         try:
             # 1. 获取协同过滤推荐
-            cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
+            cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2, min_rating)
             logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
 
             # 2. 获取TF-IDF内容特征推荐
@@ -227,7 +229,7 @@ class HybridRecommendation:
             logger.error(traceback.format_exc())
             return self._get_fallback_recommendations(top_n)
 
-    def _get_dual_hybrid_recommendations(self, user_id, top_n):
+    def _get_dual_hybrid_recommendations(self, user_id, top_n, min_rating=3.0):
         """
         双层混合推荐：CF + TF-IDF（无兴趣加权）
 
@@ -236,13 +238,14 @@ class HybridRecommendation:
         参数:
             user_id: 用户ID
             top_n: 推荐数量
+            min_rating: 最低评分阈值
 
         返回:
             list: 混合推荐结果
         """
         try:
             # 1. 获取协同过滤推荐
-            cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2)
+            cf_recommendations, similar_users, user_rating_count = self._get_cf_recommendations_no_fallback(user_id, top_n * 2, min_rating)
             logger.info(f"协同过滤结果: {len(cf_recommendations)} 个推荐")
 
             # 2. 获取TF-IDF内容特征推荐
@@ -361,9 +364,14 @@ class HybridRecommendation:
             logger.error(traceback.format_exc())
             return recommendations
 
-    def _get_cf_recommendations_no_fallback(self, user_id, top_n):
+    def _get_cf_recommendations_no_fallback(self, user_id, top_n, min_rating=3.0):
         """
         获取协同过滤推荐，不使用热门降级
+
+        参数:
+            user_id: 用户ID
+            top_n: 推荐数量
+            min_rating: 最低评分阈值
 
         返回:
             tuple: (recommendations, similar_users, user_rating_count)
@@ -371,7 +379,7 @@ class HybridRecommendation:
                 - similar_users: 相似用户数据（用于动态比例计算）
                 - user_rating_count: 用户评分数量
         """
-        logger.info(f"尝试为用户 {user_id} 获取协同过滤推荐...")
+        logger.info(f"尝试为用户 {user_id} 获取协同过滤推荐 (min_rating={min_rating})...")
 
         try:
             # 检查用户是否在评分矩阵中
@@ -392,8 +400,8 @@ class HybridRecommendation:
             logger.info(f"找到 {len(similar_users)} 个相似用户")
 
             # 生成协同过滤推荐
-            recommendations = self.user_cf._generate_recommendations_efficient(user_id, similar_users, top_n, 3.0)
-            logger.info(f"协同过滤生成了 {len(recommendations)} 个推荐")
+            recommendations = self.user_cf._generate_recommendations_efficient(user_id, similar_users, top_n, min_rating)
+            logger.info(f"协同过滤生成了 {len(recommendations)} 个推荐 (min_rating={min_rating})")
 
             # 返回推荐列表、相似用户数据和评分数量（用于动态比例计算）
             return recommendations, similar_users, user_rating_count

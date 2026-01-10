@@ -166,28 +166,39 @@ const handleQuickAction = (action) => {
 .book-card {
   cursor: pointer;
   height: 100%;
-  border-radius: 16px;
+  border-radius: 20px;
   overflow: hidden;
-  background: white;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  /* 毛玻璃效果 */
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  /* 双层描边 */
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 4px 24px -1px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   position: relative;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .book-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: rgba(0, 122, 255, 0.2);
+  transform: translateY(-6px);
+  box-shadow:
+    0 12px 40px -4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 122, 255, 0.25);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .book-card.enhanced {
-  background: white;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .book-card.enhanced:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  transform: translateY(-8px);
+  box-shadow:
+    0 16px 48px -6px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 /* 卡片发光效果 */

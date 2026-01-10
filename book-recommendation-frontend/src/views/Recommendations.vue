@@ -71,22 +71,33 @@
             type="primary"
             size="small"
             @click="loadNextPage"
-            icon="RefreshRight"
+            class="tactile-btn"
           >
+            <el-icon :class="{ 'is-rotating': loading }"><RefreshRight /></el-icon>
             换一批
           </el-button>
         </div>
       </div>
 
-      <div class="book-grid" v-loading="loading" element-loading-text="正在生成个性化推荐...">
-        <div
-          v-for="item in recommendations"
-          :key="item.bookId"
-          class="recommendation-item"
-        >
-          <BookCard :book="item" />
+      <Transition name="fade" mode="out-in">
+        <div v-if="loading" class="loading-container" key="loading">
+          <HourglassLoader text="正在生成个性化推荐..." size="72px" />
         </div>
-      </div>
+        <div
+          v-else
+          class="book-grid"
+          :key="currentOffset"
+        >
+          <div
+            v-for="(item, index) in recommendations"
+            :key="item.bookId"
+            class="recommendation-item"
+            :style="{ animationDelay: `${index * 0.05}s` }"
+          >
+            <BookCard :book="item" />
+          </div>
+        </div>
+      </Transition>
     </div>
     
     <!-- 相似用户信息（暂时隐藏） -->
@@ -127,7 +138,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { useUserStore } from '../stores/user'
 import { recommendApi } from '../api/recommendation'
 import BookCard from '../components/BookCard.vue'
+import HourglassLoader from '../components/HourglassLoader.vue'
 import { ElMessage } from 'element-plus'
+import { RefreshRight } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 
@@ -263,14 +276,77 @@ onMounted(() => {
   gap: 10px;
 }
 
+/* 触觉反馈按钮 */
+.tactile-btn {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tactile-btn:active {
+  transform: scale(0.95);
+}
+
+.tactile-btn:hover {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.tactile-btn .el-icon {
+  margin-right: 4px;
+  transition: transform 0.3s ease;
+}
+
+.tactile-btn .el-icon.is-rotating {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 淡入淡出过渡 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 .book-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 20px;
 }
 
+/* 加载容器 */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+}
+
+/* 卡片入场动画 */
 .recommendation-item {
   position: relative;
+  animation: slideUp 0.4s ease forwards;
+  opacity: 0;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .recommendation-info {

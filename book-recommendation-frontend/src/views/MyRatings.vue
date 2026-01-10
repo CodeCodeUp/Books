@@ -5,39 +5,43 @@
       <p>查看您评分过的所有图书</p>
     </div>
     
-    <div class="ratings-content" v-loading="loading">
-      <div v-if="userRatings.length > 0" class="ratings-grid">
-        <div 
-          v-for="rating in userRatings" 
-          :key="rating.ratingId"
-          class="rating-card"
-          @click="$router.push(`/books/${rating.bookId}`)"
-        >
-          <div class="book-cover">
-            <img 
-              :src="rating.imageUrlM || '/default-book.jpg'" 
-              :alt="rating.title"
-              @error="handleImageError"
-            />
-          </div>
-          <div class="book-info">
-            <h4 class="book-title">{{ rating.title }}</h4>
-            <p class="book-author">{{ rating.author || '未知作者' }}</p>
-            <div class="rating-info">
-              <el-rate :model-value="parseFloat(rating.rating)" disabled />
-              <span class="my-rating">{{ rating.rating }}分</span>
+    <div class="ratings-content">
+      <Transition name="fade" mode="out-in">
+        <div v-if="loading" class="loading-container" key="loading">
+          <HourglassLoader text="加载评分历史..." size="64px" />
+        </div>
+        <div v-else-if="userRatings.length > 0" class="ratings-grid" key="content">
+          <div
+            v-for="rating in userRatings"
+            :key="rating.ratingId"
+            class="rating-card"
+            @click="$router.push(`/books/${rating.bookId}`)"
+          >
+            <div class="book-cover">
+              <img
+                :src="rating.imageUrlM || '/default-book.jpg'"
+                :alt="rating.title"
+                @error="handleImageError"
+              />
             </div>
-            <div class="book-meta">
-              <span class="book-year">{{ rating.year || '未知年份' }}</span>
-              <span class="rating-date">{{ formatDate(rating.ratingDate) }}</span>
+            <div class="book-info">
+              <h4 class="book-title">{{ rating.title }}</h4>
+              <p class="book-author">{{ rating.author || '未知作者' }}</p>
+              <div class="rating-info">
+                <el-rate :model-value="parseFloat(rating.rating)" disabled />
+                <span class="my-rating">{{ rating.rating }}分</span>
+              </div>
+              <div class="book-meta">
+                <span class="book-year">{{ rating.year || '未知年份' }}</span>
+                <span class="rating-date">{{ formatDate(rating.ratingDate) }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      <el-empty v-else description="您还没有评分过任何图书" :image-size="120">
-        <el-button type="primary" @click="$router.push('/books')">去评分图书</el-button>
-      </el-empty>
+        <el-empty v-else description="您还没有评分过任何图书" :image-size="120" key="empty">
+          <el-button type="primary" @click="$router.push('/books')">去评分图书</el-button>
+        </el-empty>
+      </Transition>
     </div>
   </div>
 </template>
@@ -47,6 +51,7 @@ import { ref, onMounted } from 'vue'
 import { useUserStore } from '../stores/user'
 import { userApi } from '../api/user'
 import { ElMessage } from 'element-plus'
+import HourglassLoader from '../components/HourglassLoader.vue'
 
 const userStore = useUserStore()
 const loading = ref(false)
@@ -111,6 +116,28 @@ onMounted(() => {
 
 .ratings-content {
   min-height: 400px;
+}
+
+/* 加载容器 */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+}
+
+/* 淡入淡出过渡 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .ratings-grid {

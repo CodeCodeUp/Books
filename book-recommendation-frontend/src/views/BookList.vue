@@ -68,25 +68,29 @@
     
     <!-- 图书展示区域 -->
     <div class="books-section">
-      <div 
-        :class="['book-grid', viewMode]" 
-        v-loading="loading"
-        element-loading-text="正在加载精彩图书..."
-        element-loading-background="rgba(255, 255, 255, 0.9)"
-      >
-        <div 
-          v-for="(book, index) in books" 
-          :key="book.bookId"
-          :data-aos="'zoom-in'"
-          :data-aos-delay="Math.min(index * 50, 500)"
-          class="book-item-wrapper"
-        >
-          <BookCard 
-            :book="book" 
-            :class="{ 'list-view': viewMode === 'list' }"
-          />
+      <Transition name="fade" mode="out-in">
+        <div v-if="loading" class="loading-container" key="loading">
+          <HourglassLoader text="正在加载精彩图书..." size="72px" />
         </div>
-      </div>
+        <div
+          v-else
+          :class="['book-grid', viewMode]"
+          key="content"
+        >
+          <div
+            v-for="(book, index) in books"
+            :key="book.bookId"
+            :data-aos="'zoom-in'"
+            :data-aos-delay="Math.min(index * 50, 500)"
+            class="book-item-wrapper"
+          >
+            <BookCard
+              :book="book"
+              :class="{ 'list-view': viewMode === 'list' }"
+            />
+          </div>
+        </div>
+      </Transition>
       
       <!-- 空状态 -->
       <div v-if="!loading && books.length === 0" class="empty-state" data-aos="fade-up">
@@ -133,9 +137,10 @@
 import { ref, onMounted, watch } from 'vue'
 import { bookApi } from '../api/book'
 import BookCard from '../components/BookCard.vue'
+import HourglassLoader from '../components/HourglassLoader.vue'
 import { ElMessage } from 'element-plus'
-import { 
-  Search, Collection, Grid, List, Refresh, Top 
+import {
+  Search, Collection, Grid, List, Refresh, Top
 } from '@element-plus/icons-vue'
 
 const books = ref([])
@@ -371,6 +376,28 @@ onMounted(() => {
   max-width: 1400px;
   margin: 0 auto;
   min-height: 60vh;
+}
+
+/* 加载容器 */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+}
+
+/* 淡入淡出过渡 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .book-grid {

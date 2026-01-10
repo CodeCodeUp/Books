@@ -56,23 +56,24 @@ def recommend_user_based():
                 'message': 'user_id参数必须提供'
             }), 400
 
-        logger.info(f"收到混合推荐请求: user_id={user_id}, top_n={top_n}, offset={offset}")
+        logger.info(f"收到混合推荐请求: user_id={user_id}, top_n={top_n}, offset={offset}, min_rating={min_rating}")
 
         # 1. 尝试从缓存加载完整推荐列表
-        full_recommendations = user_cf.cache.load_recommendations(user_id, max_age=3600)
+        full_recommendations = user_cf.cache.load_recommendations(user_id, max_age=3600, min_rating=min_rating)
 
         # 2. 缓存不存在或已过期，重新生成完整列表
         if not full_recommendations:
             logger.info(f"缓存未命中，为用户 {user_id} 生成 {FULL_CACHE_SIZE} 本推荐...")
             full_recommendations = hybrid.get_hybrid_user_recommendations(
                 user_id=user_id,
-                top_n=FULL_CACHE_SIZE  # 一次性生成50本
+                top_n=FULL_CACHE_SIZE,  # 一次性生成50本
+                min_rating=min_rating   # 传递最低评分筛选
             )
             # 保存到缓存
-            user_cf.cache.save_recommendations(user_id, full_recommendations, 'hybrid_paged')
-            logger.info(f"已缓存用户 {user_id} 的 {len(full_recommendations)} 本推荐")
+            user_cf.cache.save_recommendations(user_id, full_recommendations, 'hybrid_paged', min_rating=min_rating)
+            logger.info(f"已缓存用户 {user_id} 的 {len(full_recommendations)} 本推荐 (min_rating={min_rating})")
         else:
-            logger.info(f"缓存命中，用户 {user_id} 已有 {len(full_recommendations)} 本推荐")
+            logger.info(f"缓存命中，用户 {user_id} 已有 {len(full_recommendations)} 本推荐 (min_rating={min_rating})")
 
         # 3. 按 offset 分页切片
         total = len(full_recommendations)
