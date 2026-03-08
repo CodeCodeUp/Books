@@ -1,0 +1,209 @@
+<mxfile>
+  <diagram name="评分管理模块流程图" id="rating-mgmt">
+    <mxGraphModel dx="2200" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="3500" pageHeight="1200">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="图书推荐系统 - 评分管理模块流程图" style="text;html=1;fontSize=22;fontStyle=1;fontColor=#000000;align=center;" vertex="1" parent="1">
+          <mxGeometry x="560" y="10" width="500" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== 列1: 用户评分流程 ===== -->
+        <mxCell id="r_title" value="一、用户评分流程" style="text;html=1;fontSize=15;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="200" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="r_start" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="155" y="100" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="r1" value="用户在图书详情页&#xa;点击评分组件" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="80" y="160" width="180" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="r2" value="选择评分(0-5分&#xa;支持0.5分间隔)" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="85" y="235" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="r3" value="POST /api/ratings/rate&#xa;rateBook(userId, bookId, rating)" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="60" y="310" width="220" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="r4" value="查询已有评分?" style="rhombus;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="105" y="385" width="130" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="r5a" value="UPDATE 更新评分&#xa;修改 rating 和 ratingDate" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;strokeWidth=3;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="10" y="480" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="r5b" value="INSERT 新增评分&#xa;创建新记录" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;strokeWidth=3;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="190" y="480" width="150" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="r6" value="updateBookRatingStats()&#xa;重新计算图书&#xa;avg_rating 和 rating_count" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;strokeWidth=3;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="565" width="220" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="r7" value="triggerRecommendation&#xa;Precompute(userId)" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;dashed=1;dashPattern=8 4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="650" width="200" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="r8" value="前端延迟500ms&#xa;重新加载图书详情&#xa;(刷新评分显示)" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="80" y="725" width="180" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="r_end" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="155" y="810" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="re1" style="rounded=1;strokeColor=#000000;" edge="1" source="r_start" target="r1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re2" style="rounded=1;strokeColor=#000000;" edge="1" source="r1" target="r2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re3" style="rounded=1;strokeColor=#000000;" edge="1" source="r2" target="r3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re4" style="rounded=1;strokeColor=#000000;" edge="1" source="r3" target="r4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re5a" value="已有" style="rounded=1;strokeColor=#000000;" edge="1" source="r4" target="r5a" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re5b" value="没有" style="rounded=1;strokeColor=#000000;" edge="1" source="r4" target="r5b" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re6a" style="rounded=1;strokeColor=#000000;" edge="1" source="r5a" target="r6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re6b" style="rounded=1;strokeColor=#000000;" edge="1" source="r5b" target="r6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re7" style="rounded=1;strokeColor=#000000;" edge="1" source="r6" target="r7" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re8" style="rounded=1;strokeColor=#000000;" edge="1" source="r7" target="r8" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="re9" style="rounded=1;strokeColor=#000000;" edge="1" source="r8" target="r_end" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ===== 列2: 评分后推荐预计算 ===== -->
+        <mxCell id="p_title" value="二、评分后推荐预计算" style="text;html=1;fontSize=15;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="470" y="60" width="250" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_start" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="580" y="100" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1" value="RatingService&#xa;triggerRecommendation&#xa;Precompute(userId)" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="490" y="160" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2" value="POST /api/cache/clear&#xa;清除用户推荐缓存&#xa;(删除文件系统缓存)" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="490" y="250" width="210" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3" value="POST /api/cache/precompute&#xa;启动后台预计算线程" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="490" y="340" width="210" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4" value="增量更新评分数据&#xa;DataLoader&#xa;.get_ratings_data&#xa;(force_refresh=True)" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;dashed=1;dashPattern=8 4;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="490" y="425" width="210" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5" value="同步更新 hybrid&#xa;数据引用" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;dashed=1;dashPattern=8 4;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="510" y="520" width="170" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="p6" value="hybrid.get_hybrid_user&#xa;_recommendations(userId)&#xa;后台异步重新生成推荐&#xa;保存到文件缓存" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;dashed=1;dashPattern=8 4;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="595" width="230" height="65" as="geometry"/>
+        </mxCell>
+        <mxCell id="p7" value="下次访问推荐页&#xa;直接命中缓存" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="510" y="695" width="170" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="p_end" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="580" y="775" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="pe1" style="rounded=1;strokeColor=#000000;" edge="1" source="p_start" target="p1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe2" style="rounded=1;strokeColor=#000000;" edge="1" source="p1" target="p2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe3" style="rounded=1;strokeColor=#000000;" edge="1" source="p2" target="p3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe4" style="rounded=1;strokeColor=#000000;" edge="1" source="p3" target="p4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe5" style="rounded=1;strokeColor=#000000;" edge="1" source="p4" target="p5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe6" style="rounded=1;strokeColor=#000000;" edge="1" source="p5" target="p6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe7" style="rounded=1;strokeColor=#000000;" edge="1" source="p6" target="p7" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="pe8" style="rounded=1;strokeColor=#000000;" edge="1" source="p7" target="p_end" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ===== 列3: 评分查询流程 ===== -->
+        <mxCell id="q_title" value="三、评分查询流程" style="text;html=1;fontSize=15;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="870" y="60" width="200" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="q_start" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="955" y="100" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="q1" value="图书详情页加载时" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="880" y="160" width="180" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="q2" value="已登录?" style="rhombus;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="920" y="230" width="100" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="q3" value="GET /ratings/user/{uid}&#xa;/book/{bid}&#xa;查询用户对该书的评分" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="870" y="330" width="200" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="q4" value="显示已评分状态&#xa;(星级高亮)" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="890" y="420" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="q5" value="点击[查看用户评分]&#xa;(懒加载)" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="880" y="500" width="180" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="q6" value="GET /books/{id}/ratings&#xa;获取评分列表(含用户信息)&#xa;username/location/country" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="860" y="580" width="220" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="q7" value="渲染评分列表&#xa;默认显示10条&#xa;可展开全部" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="890" y="670" width="160" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="q_end" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="955" y="760" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="qe1" style="rounded=1;strokeColor=#000000;" edge="1" source="q_start" target="q1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe2" style="rounded=1;strokeColor=#000000;" edge="1" source="q1" target="q2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe3" value="是" style="rounded=1;strokeColor=#000000;" edge="1" source="q2" target="q3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe3b" value="否" style="rounded=1;strokeColor=#000000;" edge="1" source="q2" target="q5" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1080" y="260"/><mxPoint x="1080" y="522"/></Array></mxGeometry></mxCell>
+        <mxCell id="qe4" style="rounded=1;strokeColor=#000000;" edge="1" source="q3" target="q4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe5" style="rounded=1;strokeColor=#000000;" edge="1" source="q4" target="q5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe6" style="rounded=1;strokeColor=#000000;" edge="1" source="q5" target="q6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe7" style="rounded=1;strokeColor=#000000;" edge="1" source="q6" target="q7" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="qe8" style="rounded=1;strokeColor=#000000;" edge="1" source="q7" target="q_end" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ===== 列4: 我的评分历史 ===== -->
+        <mxCell id="m_title" value="四、我的评分历史" style="text;html=1;fontSize=15;fontStyle=1;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="60" width="200" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_start" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1305" y="100" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="m1" value="Header 下拉菜单&#xa;点击[我的评分]" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="160" width="180" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="m2" value="GET /users/{userId}/ratings&#xa;加载用户全部评分历史" style="rounded=0;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="240" width="200" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="m3" value="渲染评分列表&#xa;显示图书信息+评分+日期" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="320" width="180" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="m4" value="点击图书&#xa;跳转图书详情" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="400" width="140" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="m_end" value="" style="ellipse;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1305" y="480" width="30" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="me1" style="rounded=1;strokeColor=#000000;" edge="1" source="m_start" target="m1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="me2" style="rounded=1;strokeColor=#000000;" edge="1" source="m1" target="m2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="me3" style="rounded=1;strokeColor=#000000;" edge="1" source="m2" target="m3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="me4" style="rounded=1;strokeColor=#000000;" edge="1" source="m3" target="m4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="me5" style="rounded=1;strokeColor=#000000;" edge="1" source="m4" target="m_end" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- 图例 -->
+        <mxCell id="lg_bg" value="" style="rounded=1;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="100" width="210" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg_t" value="图例" style="text;html=1;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1580" y="105" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg1" value="" style="rounded=1;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1515" y="130" width="30" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg1t" value="前端/用户操作" style="text;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1555" y="127" width="90" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg2" value="" style="rounded=0;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1515" y="152" width="30" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg2t" value="后端API调用" style="text;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1555" y="149" width="90" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg3" value="" style="rounded=0;fillColor=none;strokeColor=#000000;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1515" y="174" width="30" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg3t" value="数据库写操作" style="text;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1555" y="171" width="90" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg4" value="" style="rounded=1;fillColor=none;strokeColor=#000000;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="1515" y="196" width="30" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg4t" value="算法/预计算" style="text;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1555" y="193" width="80" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg5" value="" style="rhombus;fillColor=none;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1517" y="218" width="24" height="16" as="geometry"/>
+        </mxCell>
+        <mxCell id="lg5t" value="判断/分支" style="text;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1555" y="215" width="60" height="20" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
