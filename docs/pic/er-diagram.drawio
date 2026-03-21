@@ -1,55 +1,55 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0" version="29.6.1">
-  <diagram name="数据库ER图" id="er-diagram">
-    <mxGraphModel dx="2058" dy="1106" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1800" pageHeight="800" math="0" shadow="0">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0" version="29.6.1">
+  <diagram name="ER Diagram" id="er-diagram">
+    <mxGraphModel dx="2058" dy="1106" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1200" pageHeight="760" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" parent="1" style="text;html=1;fontSize=22;fontStyle=1;fontColor=#000000;align=center;" value="图书推荐系统 - 数据库结构设计图" vertex="1">
-          <mxGeometry height="40" width="600" x="350" y="15" as="geometry" />
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=28;fontStyle=1;fontColor=#1F2937;align=center;verticalAlign=middle;whiteSpace=wrap;" value="图书推荐系统数据库 ER 图" vertex="1">
+          <mxGeometry height="48" width="540" x="330" y="20" as="geometry" />
         </mxCell>
-        <mxCell id="users_entity" parent="1" style="swimlane;fontStyle=1;startSize=28;fillColor=none;strokeColor=#000000;fontSize=13;align=center;collapsible=0;" value="users" vertex="1">
-          <mxGeometry height="260" width="310" x="50" y="80" as="geometry" />
+        <mxCell id="users_entity" parent="1" style="swimlane;fontStyle=1;startSize=34;rounded=1;arcSize=8;fillColor=#DCEBFF;swimlaneFillColor=#F8FBFF;strokeColor=#355070;strokeWidth=1.4;fontSize=16;fontColor=#14213D;align=center;collapsible=0;html=1;" value="users" vertex="1">
+          <mxGeometry height="296" width="300" x="50" y="100" as="geometry" />
         </mxCell>
-        <mxCell id="users_fields" parent="users_entity" style="text;fontSize=10;fontFamily=Courier New;align=left;verticalAlign=top;spacingTop=2;spacingLeft=4;fillColor=none;strokeColor=none;connectable=0;" value="PK  user_id        INT(11)       NN, AI&#xa;UK  username       VARCHAR(50)   NN&#xa;    password       VARCHAR(255)  NN&#xa;    nickname       VARCHAR(50)&#xa;    age            INT(11)&#xa;    age_group      VARCHAR(20)&#xa;    avatar_url     VARCHAR(500)&#xa;    status         TINYINT(4)    DEFAULT 1&#xa;    created_at     TIMESTAMP&#xa;    updated_at     TIMESTAMP&#xa;    last_login_at  TIMESTAMP" vertex="1">
-          <mxGeometry height="232" width="310" y="28" as="geometry" />
+        <mxCell id="users_fields" parent="users_entity" style="text;html=1;fontSize=12;fontFamily=Courier New;fontColor=#1F2937;align=left;verticalAlign=top;spacingTop=6;spacingLeft=10;fillColor=none;strokeColor=none;connectable=0;" value="&lt;font style=&quot;font-size: 16px;&quot; face=&quot;Times New Roman&quot;&gt;&lt;b&gt;PK  user_id        INT(11)       NN, AI&lt;br&gt;UK  username       VARCHAR(50)   NN&lt;br&gt;    password       VARCHAR(255)  NN&lt;br&gt;    nickname       VARCHAR(50)&lt;br&gt;    age            INT(11)&lt;br&gt;    age_group      VARCHAR(20)&lt;br&gt;    avatar_url     VARCHAR(500)&lt;br&gt;    status         TINYINT(4)    DEFAULT 1&lt;br&gt;    created_at     TIMESTAMP&lt;br&gt;    updated_at     TIMESTAMP&lt;br&gt;    last_login_at  TIMESTAMP&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="262" width="300" y="34" as="geometry" />
         </mxCell>
-        <mxCell id="ratings_entity" parent="1" style="swimlane;fontStyle=1;startSize=28;fillColor=none;strokeColor=#000000;fontSize=13;align=center;collapsible=0;" value="ratings" vertex="1">
-          <mxGeometry height="170" width="310" x="500" y="120" as="geometry" />
+        <mxCell id="ratings_entity" parent="1" style="swimlane;fontStyle=1;startSize=34;rounded=1;arcSize=8;fillColor=#DCEBFF;swimlaneFillColor=#F8FBFF;strokeColor=#355070;strokeWidth=1.4;fontSize=16;fontColor=#14213D;align=center;collapsible=0;html=1;" value="ratings" vertex="1">
+          <mxGeometry height="190" width="300" x="394" y="153" as="geometry" />
         </mxCell>
-        <mxCell id="ratings_fields" parent="ratings_entity" style="text;fontSize=10;fontFamily=Courier New;align=left;verticalAlign=top;spacingTop=2;spacingLeft=4;fillColor=none;strokeColor=none;connectable=0;" value="PK  rating_id      BIGINT(20)    NN, AI&#xa;FK  user_id        INT(11)       NN&#xa;FK  book_id        VARCHAR(20)   NN&#xa;    rating         DECIMAL(2,1)  NN&#xa;    rating_date    TIMESTAMP&#xa;    created_at     TIMESTAMP" vertex="1">
-          <mxGeometry height="142" width="310" y="28" as="geometry" />
+        <mxCell id="ratings_fields" parent="ratings_entity" style="text;html=1;fontSize=12;fontFamily=Courier New;fontColor=#1F2937;align=left;verticalAlign=top;spacingTop=6;spacingLeft=10;fillColor=none;strokeColor=none;connectable=0;" value="&lt;font style=&quot;font-size: 16px;&quot; face=&quot;Times New Roman&quot;&gt;&lt;b&gt;PK  rating_id      BIGINT(20)    NN, AI&lt;br&gt;FK  user_id        INT(11)       NN&lt;br&gt;FK  book_id        VARCHAR(20)   NN&lt;br&gt;    rating         DECIMAL(2,1)  NN&lt;br&gt;    rating_date    TIMESTAMP&lt;br&gt;    created_at     TIMESTAMP&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="156" width="300" y="34" as="geometry" />
         </mxCell>
-        <mxCell id="books_entity" parent="1" style="swimlane;fontStyle=1;startSize=28;fillColor=none;strokeColor=#000000;fontSize=13;align=center;collapsible=0;" value="books" vertex="1">
-          <mxGeometry height="290" width="310" x="950" y="80" as="geometry" />
+        <mxCell id="books_entity" parent="1" style="swimlane;fontStyle=1;startSize=34;rounded=1;arcSize=8;fillColor=#DCEBFF;swimlaneFillColor=#F8FBFF;strokeColor=#355070;strokeWidth=1.4;fontSize=16;fontColor=#14213D;align=center;collapsible=0;html=1;" value="books" vertex="1">
+          <mxGeometry height="315" width="330" x="737" y="97" as="geometry" />
         </mxCell>
-        <mxCell id="books_fields" parent="books_entity" style="text;fontSize=10;fontFamily=Courier New;align=left;verticalAlign=top;spacingTop=2;spacingLeft=4;fillColor=none;strokeColor=none;connectable=0;" value="PK  book_id        VARCHAR(20)   NN&#xa;    title          VARCHAR(500)  NN&#xa;    author         VARCHAR(200)&#xa;    publisher      VARCHAR(200)&#xa;    year           INT(11)&#xa;FK  theme_id       INT(11)&#xa;    image_url_s    VARCHAR(500)&#xa;    image_url_m    VARCHAR(500)&#xa;    image_url_l    VARCHAR(500)&#xa;    avg_rating     DECIMAL(3,2)&#xa;    rating_count   INT(11)&#xa;    created_at     TIMESTAMP&#xa;    updated_at     TIMESTAMP" vertex="1">
-          <mxGeometry height="262" width="310" y="28" as="geometry" />
+        <mxCell id="books_fields" parent="books_entity" style="text;html=1;fontSize=12;fontFamily=Courier New;fontColor=#1F2937;align=left;verticalAlign=top;spacingTop=6;spacingLeft=10;fillColor=none;strokeColor=none;connectable=0;" value="&lt;font face=&quot;Times New Roman&quot; style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;PK  book_id        VARCHAR(20)   NN&lt;br&gt;    title          VARCHAR(500)  NN&lt;br&gt;    author         VARCHAR(200)&lt;br&gt;    publisher      VARCHAR(200)&lt;br&gt;    year           INT(11)&lt;br&gt;FK  theme_id       INT(11)&lt;br&gt;    image_url_s    VARCHAR(500)&lt;br&gt;    image_url_m    VARCHAR(500)&lt;br&gt;    image_url_l    VARCHAR(500)&lt;br&gt;    avg_rating     DECIMAL(3,2)&lt;br&gt;    rating_count   INT(11)&lt;br&gt;    created_at     TIMESTAMP&lt;br&gt;    updated_at     TIMESTAMP&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="312" width="330" y="34" as="geometry" />
         </mxCell>
-        <mxCell id="ui_entity" parent="1" style="swimlane;fontStyle=1;startSize=28;fillColor=none;strokeColor=#000000;fontSize=13;align=center;collapsible=0;" value="user_interests" vertex="1">
-          <mxGeometry height="120" width="310" x="50" y="450" as="geometry" />
+        <mxCell id="ui_entity" parent="1" style="swimlane;fontStyle=1;startSize=34;rounded=1;arcSize=8;fillColor=#DCEBFF;swimlaneFillColor=#F8FBFF;strokeColor=#355070;strokeWidth=1.4;fontSize=16;fontColor=#14213D;align=center;collapsible=0;html=1;" value="user_interests" vertex="1">
+          <mxGeometry height="144" width="300" x="165" y="470" as="geometry" />
         </mxCell>
-        <mxCell id="ui_fields" parent="ui_entity" style="text;fontSize=10;fontFamily=Courier New;align=left;verticalAlign=top;spacingTop=2;spacingLeft=4;fillColor=none;strokeColor=none;connectable=0;" value="PK  id             BIGINT(20)    NN, AI&#xa;FK  user_id        INT(11)       NN&#xa;FK  theme_id       INT(11)       NN&#xa;    created_at     TIMESTAMP" vertex="1">
-          <mxGeometry height="92" width="310" y="28" as="geometry" />
+        <mxCell id="ui_fields" parent="ui_entity" style="text;html=1;fontSize=12;fontFamily=Courier New;fontColor=#1F2937;align=left;verticalAlign=top;spacingTop=6;spacingLeft=10;fillColor=none;strokeColor=none;connectable=0;" value="&lt;font style=&quot;font-size: 16px;&quot; face=&quot;Times New Roman&quot;&gt;&lt;b&gt;PK  id             BIGINT(20)    NN, AI&lt;br&gt;FK  user_id        INT(11)       NN&lt;br&gt;FK  theme_id       INT(11)       NN&lt;br&gt;    created_at     TIMESTAMP&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="300" y="34" as="geometry" />
         </mxCell>
-        <mxCell id="bt_entity" parent="1" style="swimlane;fontStyle=1;startSize=28;fillColor=none;strokeColor=#000000;fontSize=13;align=center;collapsible=0;" value="book_theme" vertex="1">
-          <mxGeometry height="170" width="310" x="950" y="450" as="geometry" />
+        <mxCell id="bt_entity" parent="1" style="swimlane;fontStyle=1;startSize=34;rounded=1;arcSize=8;fillColor=#DCEBFF;swimlaneFillColor=#F8FBFF;strokeColor=#355070;strokeWidth=1.4;fontSize=16;fontColor=#14213D;align=center;collapsible=0;html=1;" value="book_theme" vertex="1">
+          <mxGeometry height="172" width="300" x="575" y="470" as="geometry" />
         </mxCell>
-        <mxCell id="bt_fields" parent="bt_entity" style="text;fontSize=10;fontFamily=Courier New;align=left;verticalAlign=top;spacingTop=2;spacingLeft=4;fillColor=none;strokeColor=none;connectable=0;" value="PK  theme_id       INT(11)       NN, AI&#xa;UK  theme_name_en  VARCHAR(100)  NN&#xa;    theme_name_zh  VARCHAR(100)  NN&#xa;    description    VARCHAR(500)&#xa;    created_at     TIMESTAMP&#xa;    updated_at     TIMESTAMP" vertex="1">
-          <mxGeometry height="142" width="310" y="28" as="geometry" />
+        <mxCell id="bt_fields" parent="bt_entity" style="text;html=1;fontSize=12;fontFamily=Courier New;fontColor=#1F2937;align=left;verticalAlign=top;spacingTop=6;spacingLeft=10;fillColor=none;strokeColor=none;connectable=0;" value="&lt;font style=&quot;font-size: 14px;&quot; face=&quot;Times New Roman&quot;&gt;&lt;b style=&quot;&quot;&gt;PK  theme_id       INT(11)       NN, AI&lt;br&gt;UK  theme_name_en  VARCHAR(100)  NN&lt;br&gt;    theme_name_zh  VARCHAR(100)  NN&lt;br&gt;    description    VARCHAR(500)&lt;br&gt;    created_at     TIMESTAMP&lt;br&gt;    updated_at     TIMESTAMP&lt;/b&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="130" width="300" y="34" as="geometry" />
         </mxCell>
-        <mxCell id="rel1" edge="1" parent="1" source="users_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#000000;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=10;exitX=1;exitY=0.4;entryX=0;entryY=0.5;" target="ratings_entity" value="user_id">
+        <mxCell id="rel1" edge="1" parent="1" source="users_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#4B5563;strokeWidth=1.4;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=12;fontColor=#374151;labelBackgroundColor=#FFFFFF;jettySize=auto;html=1;exitX=1;exitY=0.4;entryX=0;entryY=0.5;" target="ratings_entity" value="user_id">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="rel2" edge="1" parent="1" source="books_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#000000;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=10;exitX=0;exitY=0.3;entryX=1;entryY=0.5;" target="ratings_entity" value="book_id">
+        <mxCell id="rel2" edge="1" parent="1" source="books_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#4B5563;strokeWidth=1.4;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=12;fontColor=#374151;labelBackgroundColor=#FFFFFF;jettySize=auto;html=1;exitX=0;exitY=0.3;entryX=1;entryY=0.5;" target="ratings_entity" value="book_id">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="rel3" edge="1" parent="1" source="bt_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#000000;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=10;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="books_entity" value="theme_id">
+        <mxCell id="rel3" edge="1" parent="1" source="bt_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#4B5563;strokeWidth=1.4;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=12;fontColor=#374151;labelBackgroundColor=#FFFFFF;jettySize=auto;html=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" target="books_entity" value="theme_id">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="rel4" edge="1" parent="1" source="users_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#000000;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=10;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="ui_entity" value="user_id">
+        <mxCell id="rel4" edge="1" parent="1" source="users_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#4B5563;strokeWidth=1.4;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=12;fontColor=#374151;labelBackgroundColor=#FFFFFF;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="ui_entity" value="user_id">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="rel5" edge="1" parent="1" source="bt_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#000000;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=10;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="ui_entity" value="theme_id">
+        <mxCell id="rel5" edge="1" parent="1" source="bt_entity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#4B5563;strokeWidth=1.4;startArrow=ERone;startFill=0;endArrow=ERmany;endFill=0;fontSize=12;fontColor=#374151;labelBackgroundColor=#FFFFFF;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" target="ui_entity" value="theme_id">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>
