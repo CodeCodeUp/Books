@@ -1,11 +1,11 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0" version="29.6.1">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0" version="29.6.4">
   <diagram name="推荐系统模块流程图" id="recommendation-sys">
-    <mxGraphModel dx="2940" dy="1580" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1600" pageHeight="1800" math="0" shadow="0">
+    <mxGraphModel dx="2744" dy="1875" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1600" pageHeight="1800" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="title" parent="1" style="text;html=1;fontSize=30;fontStyle=1;fontColor=#000000;align=center;" value="图书推荐系统 - 推荐系统模块流程图" vertex="1">
-          <mxGeometry height="50" width="700" x="350" as="geometry" />
+          <mxGeometry height="50" width="700" x="130" y="-10" as="geometry" />
         </mxCell>
         <mxCell id="pr_title" parent="1" style="text;html=1;fontSize=22;fontStyle=1;fontColor=#000000;" value="一、个人推荐页面" vertex="1">
           <mxGeometry height="35" width="260" x="100" y="60" as="geometry" />

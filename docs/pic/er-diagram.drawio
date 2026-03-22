@@ -1,11 +1,11 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0" version="29.6.1">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0" version="29.6.4">
   <diagram name="ER Diagram" id="er-diagram">
     <mxGraphModel dx="2058" dy="1106" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1200" pageHeight="760" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title" parent="1" style="text;html=1;fontSize=28;fontStyle=1;fontColor=#1F2937;align=center;verticalAlign=middle;whiteSpace=wrap;" value="图书推荐系统数据库 ER 图" vertex="1">
-          <mxGeometry height="48" width="540" x="330" y="20" as="geometry" />
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=28;fontStyle=1;fontColor=#1F2937;align=center;verticalAlign=middle;whiteSpace=wrap;" value="&lt;font face=&quot;Helvetica&quot; style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;span style=&quot;line-height: 150%;&quot;&gt;图书推荐系统数据库表结构设计图&lt;/span&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="48" width="540" x="274" y="14" as="geometry" />
         </mxCell>
         <mxCell id="users_entity" parent="1" style="swimlane;fontStyle=1;startSize=34;rounded=1;arcSize=8;fillColor=#DCEBFF;swimlaneFillColor=#F8FBFF;strokeColor=#355070;strokeWidth=1.4;fontSize=16;fontColor=#14213D;align=center;collapsible=0;html=1;" value="users" vertex="1">
           <mxGeometry height="296" width="300" x="50" y="100" as="geometry" />
